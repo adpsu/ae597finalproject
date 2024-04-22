@@ -1,0 +1,61 @@
+import pandas as pd
+import numpy as np
+
+# Load the Excel file
+file_path = 'path_to_your_file.xlsx'
+xls = pd.ExcelFile(file_path)
+data = xls.parse('data_with_CA_and_VT')
+
+# Define the parameters for the new DataFrame
+years = range(2010, 2025)
+states = data['state_code'].unique()
+classes = ['Compact', 'Midsize', 'Pickup', 'SUV']
+techs = ['BEV_200', 'BEV_300', 'BEV_400', 'PHEV_25', 'PHEV_50', 'FCEV', 'HEV_Gasoline', 'ICEV_Gasoline', 'ICEV_NG']
+incomes = ['Low_Income', 'Middle_Income', 'High_Income']
+
+# Create a multi-index for the new DataFrame
+from itertools import product
+index = pd.MultiIndex.from_product([states, years, ['Personal_LDV'], classes, techs, incomes], 
+                                   names=["State", "Year", "Mode", "Class", "Tech", "Income"])
+
+# Initialize the DataFrame
+tempo_format = pd.DataFrame(index=index).reset_index()
+tempo_format['State_Tax_Credit_Dol_Per_Veh'] = 0  # Initialize with 0
+
+# Mapping to determine which techs correspond to which range of miles
+tech_range_mapping = {
+    'BEV_200': 200,
+    'BEV_300': 300,
+    'BEV_400': 400,
+    'PHEV_25': 25,
+    'PHEV_50': 50
+}
+
+# Function to check and update the credit amount based on vehicle and income group
+def update_credits(row):
+    state, year, income = row['State'], row['Year'], row['Income'].split('_')[0].lower()
+    tech = row['Tech']
+    filtered_data = data[(data['state_code'] == state) & (data['year'] == year) & (data['income_group'] == income)]
+
+    for _, entry in filtered_data.iterrows():
+        # Process BEV
+        if entry['bevvehsubdum_year'] == 1 and tech.startswith('BEV'):
+            max_range = tech_range_mapping.get(tech, np.inf)
+            if pd.notna(entry['bevvehsub_minmiles']) and entry['bevvehsub_minmiles'] <= max_range:
+                row['State_Tax_Credit_Dol_Per_Veh'] = entry['bevamt_year']
+        # Process PHEV
+        if entry['phevvehsubdum_year'] == 1 and tech.startswith('PHEV'):
+            max_range = tech_range_mapping.get(tech, np.inf)
+            if pd.notna(entry['phevvehsub_minmiles']) and entry['phevvehsub_minmiles'] <= max_range:
+                row['State_Tax_Credit_Dol_Per_Veh'] = entry['phevamt_year']
+
+    return row
+
+# Apply the function to update the DataFrame
+tempo_format = tempo_format.apply(update_credits, axis=1)
+
+# Save the new DataFrame to the same Excel file in a new sheet
+with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:
+    tempo_format.to_excel(writer, sheet_name='TEMPO_format', index=False)
+
+print("New sheet 'TEMPO_format' has been created and saved successfully.")
