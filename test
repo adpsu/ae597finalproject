@@ -1,20 +1,26 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import input_file_name, regexp_extract
 
 # Create a Spark session
 spark = SparkSession.builder \
-    .appName("Load Parquet Files") \
+    .appName("Load and Modify Parquet Files") \
     .getOrCreate()
 
 # Define the base directory
 base_directory = "/path/to/model_year=2050/"
 
 # Load Parquet files from directories that match the pattern
-# The '*' wildcard matches any sequence of characters
 df = spark.read.parquet(base_directory + "subsector=Personal_LDV+*/metric=*/")
 
+# Extract 'vehicle_type' from the file path
+df = df.withColumn("file_path", input_file_name())
+df = df.withColumn("vehicle_type", regexp_extract("file_path", "subsector=Personal_LDV\+([^/]+)", 1))
+
+# Extract 'charger_type' from the file path
+df = df.withColumn("charger_type", regexp_extract("file_path", "metric=([^/]+)", 1))
+
 # Show the DataFrame schema and a preview of the data
-df.printSchema()
-df.show()
+df.select("vehicle_type", "charger_type").show()
 
 # Stop the Spark session
 spark.stop()
