@@ -1,61 +1,43 @@
-import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
+import pandas as pd
 
-# Assuming ev_df is already loaded with the appropriate columns
-# ev_df = pd.read_csv('path_to_your_data.csv')  # Uncomment and modify with your actual data path
-# and_filtered_df = pd.read_csv('path_to_your_benchmark_data.csv')  # Load benchmark data
+# Simulated data for the plot example
+tech_types = ['BEV_100', 'BEV_200', 'BEV_300', 'BEV_400', 'BEV_450']
+msrp_values = [35000, 40000, 45000, 50000, 55000]
+fe_comb_values = [100, 150, 200, 250, 300]
 
-# Define all Tech types, but benchmarks are only for the last five
-tech_types = ['BEV_100', 'BEV_150', 'BEV_200', 'BEV_250', 'BEV_300', 'BEV_350', 'BEV_400', 'BEV_450']
-filtered_df = ev_df[ev_df['Tech'].isin(tech_types)]
+# Benchmark data for the last three technologies
+benchmark_data = {
+    'Tech': ['BEV_300', 'BEV_400', 'BEV_450'],
+    'msrp': [47000, 52000, 57000],
+    'fe_comb': [210, 260, 310]
+}
+benchmark_df = pd.DataFrame(benchmark_data)
 
-# Only last five Techs need benchmarks
-techs_with_benchmarks = tech_types[-5:]  # Adjust this slice based on your exact needs
+# Creating the plot
+fig, ax = plt.subplots(figsize=(10, 6))
 
-def plot_bubble_chart(y_column, title, ylabel):
-    plt.figure(figsize=(14, 8))
-    ax = plt.gca()
-    
-    # Mapping each tech type to a numerical index for x-axis positioning
-    tech_positions = {tech: i+1 for i, tech in enumerate(tech_types)}
-    
-    # Plotting benchmark lines for the specified tech types
-    for tech in techs_with_benchmarks:
-        benchmark = and_filtered_df[and_filtered_df['Tech'] == tech]
-        if not benchmark.empty:
-            x_position = tech_positions[tech]
-            if y_column == 'MSRP':
-                ax.axvline(x=x_position, color='red', linestyle='-', linewidth=2)
-                ax.text(x_position, benchmark['msrp'].values[0], ' Benchmark', color='red', ha='right')
-            else:
-                ax.axvline(x=x_position, color='red', linestyle='-', linewidth=2)
-                ax.text(x_position, benchmark['fe_comb'].values[0], ' Benchmark', color='red', ha='right')
+# Plotting MSRP and fe_comb data points
+ax.scatter(tech_types, msrp_values, color='blue', label='MSRP')
+ax.scatter(tech_types, fe_comb_values, color='green', label='Fuel Efficiency (fe_comb)')
 
-    # Plotting the data
-    for tech in tech_types:
-        subset = filtered_df[filtered_df['Tech'] == tech]
-        sizes_scaled = subset['total_sales'] / 2  # Scale down the size by half
-        scatter = ax.scatter([tech_positions[tech]] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
+# Adding benchmark points using rectangular markers
+for idx, row in benchmark_df.iterrows():
+    tech_index = tech_types.index(row['Tech'])
+    # MSRP benchmark rectangle
+    ax.scatter(tech_index, row['msrp'], color='red', s=300, edgecolor='black', marker='s', linewidth=1, label=f'MSRP Benchmark for {row["Tech"]}' if idx == 0 else "")
+    # Fuel efficiency benchmark rectangle
+    ax.scatter(tech_index, row['fe_comb'], color='purple', s=300, edgecolor='black', marker='s', linewidth=1, label=f'fe_comb Benchmark for {row["Tech"]}' if idx == 0 else "")
 
-        # Annotate the largest and smallest bubbles
-        if not subset.empty:
-            largest = subset.loc[subset['total_sales'].idxmax()]
-            smallest = subset.loc[subset['total_sales'].idxmin()]
-            ax.annotate(largest['Best Match MSRP'], (tech_positions[tech], largest[y_column]), xytext=(40,-10),
-                        textcoords="offset points", ha='right', 
-                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-90"))
-            ax.annotate(smallest['Best Match MSRP'], (tech_positions[tech], smallest[y_column]), xytext=(40,10),
-                        textcoords="offset points", ha='right', 
-                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90"))
+# Adjusting x-axis to show tech types correctly
+ax.set_xticks(range(len(tech_types)))
+ax.set_xticklabels(tech_types)
 
-    plt.xticks(range(1, len(tech_types)+1), tech_types)
-    plt.xlabel('Technology')
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.grid(True)
+# Setting plot titles and labels
+ax.set_title('MSRP and Fuel Efficiency with Benchmark Rectangles')
+ax.set_xlabel('Technology')
+ax.set_ylabel('Value')
+ax.legend()
+ax.grid(True)
 
-    # Custom legend for bubble sizes
-    sales_values = np.linspace(subset['total_sales'].min(), subset['total_sales'].max(), num=5) / 2
-    legend_labels = [f'{int(s*2)}' for s in sales_values]  # Reverse the scaling for display
-    handles = [plt.scatter([], [], s=s, label=l, color="gray", alpha=0.5) for s, l in zip(sales_values, legend_labels)]
+plt.show()
