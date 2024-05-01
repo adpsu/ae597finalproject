@@ -1,35 +1,44 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Assume ev_df is already loaded with the appropriate columns
-# ev_df = pd.read_csv('path_to_your_data.csv')  # You would use this line to load your data
+# Assuming ev_df is already loaded with the appropriate columns
+# ev_df = pd.read_csv('path_to_your_data.csv')  # Uncomment and modify with your actual data path
 
 # Filter out data for the Tech types we're interested in
 tech_types = ['BEV_200', 'BEV_300', 'BEV_400']
 filtered_df = ev_df[ev_df['Tech'].isin(tech_types)]
 
-# Plotting MSRP vs. Tech with total_sales as bubble size
-plt.figure(figsize=(10, 6))
-for tech in tech_types:
-    subset = filtered_df[filtered_df['Tech'] == tech]
-    plt.scatter([tech] * len(subset), subset['MSRP'], s=subset['total_sales'], alpha=0.5, label=tech)
+# Define circle sizes and legend labels for total sales
+sizes = {500: 50, 2000: 100, 5000: 200, 10000: 400, 20000: 800, 30000: 1600}
 
-plt.xlabel('Technology')
-plt.ylabel('MSRP ($)')
-plt.title('MSRP by BEV Technology with Sales Volume as Bubble Size')
-plt.legend(title='BEV Tech')
-plt.grid(True)
-plt.show()
+def plot_bubble_chart(y_column, title, ylabel):
+    plt.figure(figsize=(12, 8))
+    for tech in tech_types:
+        subset = filtered_df[filtered_df['Tech'] == tech]
+        sizes_scaled = subset['total_sales'] / 2  # Scale down the size by half
+        scatter = plt.scatter([tech] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
 
-# Plotting fe_comb vs. Tech with total_sales as bubble size
-plt.figure(figsize=(10, 6))
-for tech in tech_types:
-    subset = filtered_df[filtered_df['Tech'] == tech]
-    plt.scatter([tech] * len(subset), subset['fe_comb'], s=subset['total_sales'], alpha=0.5, label=tech)
+        # Annotate the largest and smallest bubbles
+        if not subset.empty:
+            largest = subset.loc[subset['total_sales'].idxmax()]
+            smallest = subset.loc[subset['total_sales'].idxmin()]
+            plt.annotate(largest['Best Match MSRP'], (tech, largest[y_column]), textcoords="offset points", xytext=(0,10), ha='center')
+            plt.annotate(smallest['Best Match MSRP'], (tech, smallest[y_column]), textcoords="offset points", xytext=(0,-15), ha='center')
 
-plt.xlabel('Technology')
-plt.ylabel('Fuel Efficiency (wh/mile)')
-plt.title('Fuel Efficiency by BEV Technology with Sales Volume as Bubble Size')
-plt.legend(title='BEV Tech')
-plt.grid(True)
-plt.show()
+    plt.xlabel('Technology')
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True)
+    
+    # Custom legend for bubble sizes
+    legend_labels = [f'<{k}: {v/2:.1f}' for k, v in sizes.items()]  # Adjusting the radius size in the legend
+    handles = [plt.scatter([], [], s=v/2, label=str(k), color="gray", alpha=0.5) for k, v in sizes.items()]
+    plt.legend(handles=handles, title="Total Sales (size)", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.show()
+
+# Plot for MSRP
+plot_bubble_chart('MSRP', 'MSRP by BEV Technology with Sales Volume as Bubble Size', 'MSRP ($)')
+
+# Plot for fe_comb
+plot_bubble_chart('fe_comb', 'Fuel Efficiency by BEV Technology with Sales Volume as Bubble Size', 'Fuel Efficiency (wh/mile)')
