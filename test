@@ -14,30 +14,34 @@ def plot_bubble_chart(y_column, title, ylabel):
     plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
+    tech_positions = {tech: i for i, tech in enumerate(tech_types, start=1)}  # Position techs numerically for plotting
+
     # Draw benchmark lines from another dataset
     for tech in tech_types:
         benchmark = and_filtered_df[and_filtered_df['Tech'] == tech]
-        if y_column == 'MSRP':
-            ax.axhline(y=benchmark['msrp'].values[0], color='r', linestyle='-', linewidth=2)
-        else:
-            ax.axhline(y=benchmark['fe_comb'].values[0], color='r', linestyle='-', linewidth=2)
+        if not benchmark.empty:
+            if y_column == 'MSRP':
+                ax.axhline(y=benchmark['msrp'].values[0], xmin=(tech_positions[tech]-0.3)/len(tech_types), xmax=(tech_positions[tech]+0.3)/len(tech_types), color='r', linestyle='-', linewidth=2)
+            else:
+                ax.axhline(y=benchmark['fe_comb'].values[0], xmin=(tech_positions[tech]-0.3)/len(tech_types), xmax=(tech_positions[tech]+0.3)/len(tech_types), color='r', linestyle='-', linewidth=2)
 
     for tech in tech_types:
         subset = filtered_df[filtered_df['Tech'] == tech]
         sizes_scaled = subset['total_sales'] / 2  # Scale down the size by half
-        scatter = ax.scatter([tech] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
+        scatter = ax.scatter([tech_positions[tech]] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
 
         # Annotate the largest and smallest bubbles
         if not subset.empty:
             largest = subset.loc[subset['total_sales'].idxmax()]
             smallest = subset.loc[subset['total_sales'].idxmin()]
-            ax.annotate(largest['Best Match MSRP'], (tech, largest[y_column]), xytext=(40,-10),
+            ax.annotate(largest['Best Match MSRP'], (tech_positions[tech], largest[y_column]), xytext=(40,-10),
                         textcoords="offset points", ha='right', 
                         arrowprops=dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=-105,rad=10"))
-            ax.annotate(smallest['Best Match MSRP'], (tech, smallest[y_column]), xytext=(40,10),
+            ax.annotate(smallest['Best Match MSRP'], (tech_positions[tech], smallest[y_column]), xytext=(40,10),
                         textcoords="offset points", ha='right', 
                         arrowprops=dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=105,rad=10"))
 
+    plt.xticks(range(1, len(tech_types)+1), tech_types)
     plt.xlabel('Technology')
     plt.ylabel(ylabel)
     plt.title(title)
