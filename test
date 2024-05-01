@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Assuming ev_df is already loaded with the appropriate columns
 # ev_df = pd.read_csv('path_to_your_data.csv')  # Uncomment and modify with your actual data path
@@ -8,22 +9,23 @@ import matplotlib.pyplot as plt
 tech_types = ['BEV_200', 'BEV_300', 'BEV_400']
 filtered_df = ev_df[ev_df['Tech'].isin(tech_types)]
 
-# Define circle sizes and legend labels for total sales
-sizes = {500: 50, 2000: 100, 5000: 200, 10000: 400, 20000: 800, 30000: 1600}
-
 def plot_bubble_chart(y_column, title, ylabel):
     plt.figure(figsize=(12, 8))
+    ax = plt.gca()
+    
     for tech in tech_types:
         subset = filtered_df[filtered_df['Tech'] == tech]
         sizes_scaled = subset['total_sales'] / 2  # Scale down the size by half
-        scatter = plt.scatter([tech] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
+        scatter = ax.scatter([tech] * len(subset), subset[y_column], s=sizes_scaled, alpha=0.5, label=tech)
 
         # Annotate the largest and smallest bubbles
         if not subset.empty:
             largest = subset.loc[subset['total_sales'].idxmax()]
             smallest = subset.loc[subset['total_sales'].idxmin()]
-            plt.annotate(largest['Best Match MSRP'], (tech, largest[y_column]), textcoords="offset points", xytext=(0,10), ha='center')
-            plt.annotate(smallest['Best Match MSRP'], (tech, smallest[y_column]), textcoords="offset points", xytext=(0,-15), ha='center')
+            ax.annotate(largest['Best Match MSRP'], (tech, largest[y_column]), xytext=(40,-10),
+                        textcoords="offset points", ha='right', arrowprops=dict(arrowstyle="->"))
+            ax.annotate(smallest['Best Match MSRP'], (tech, smallest[y_column]), xytext=(40,10),
+                        textcoords="offset points", ha='right', arrowprops=dict(arrowstyle="->"))
 
     plt.xlabel('Technology')
     plt.ylabel(ylabel)
@@ -31,9 +33,10 @@ def plot_bubble_chart(y_column, title, ylabel):
     plt.grid(True)
     
     # Custom legend for bubble sizes
-    legend_labels = [f'<{k}: {v/2:.1f}' for k, v in sizes.items()]  # Adjusting the radius size in the legend
-    handles = [plt.scatter([], [], s=v/2, label=str(k), color="gray", alpha=0.5) for k, v in sizes.items()]
-    plt.legend(handles=handles, title="Total Sales (size)", bbox_to_anchor=(1.05, 1), loc='upper left')
+    sales_values = np.linspace(subset['total_sales'].min(), subset['total_sales'].max(), num=5) / 2
+    legend_labels = [f'{int(s*2)}' for s in sales_values]  # Reverse the scaling for display
+    handles = [plt.scatter([], [], s=s, label=l, color="gray", alpha=0.5) for s, l in zip(sales_values, legend_labels)]
+    ax.legend(handles=handles, title="Total Sales (size)", bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.show()
 
