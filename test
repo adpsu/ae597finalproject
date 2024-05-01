@@ -1,43 +1,20 @@
-import matplotlib.pyplot as plt
-import pandas as pd
+from pyspark.sql import SparkSession
 
-# Simulated data for the plot example
-tech_types = ['BEV_100', 'BEV_200', 'BEV_300', 'BEV_400', 'BEV_450']
-msrp_values = [35000, 40000, 45000, 50000, 55000]
-fe_comb_values = [100, 150, 200, 250, 300]
+# Create a Spark session
+spark = SparkSession.builder \
+    .appName("Load Parquet Files") \
+    .getOrCreate()
 
-# Benchmark data for the last three technologies
-benchmark_data = {
-    'Tech': ['BEV_300', 'BEV_400', 'BEV_450'],
-    'msrp': [47000, 52000, 57000],
-    'fe_comb': [210, 260, 310]
-}
-benchmark_df = pd.DataFrame(benchmark_data)
+# Define the base directory
+base_directory = "/path/to/model_year=2050/"
 
-# Creating the plot
-fig, ax = plt.subplots(figsize=(10, 6))
+# Load Parquet files from directories that match the pattern
+# The '*' wildcard matches any sequence of characters
+df = spark.read.parquet(base_directory + "subsector=Personal_LDV+*/metric=*/")
 
-# Plotting MSRP and fe_comb data points
-ax.scatter(tech_types, msrp_values, color='blue', label='MSRP')
-ax.scatter(tech_types, fe_comb_values, color='green', label='Fuel Efficiency (fe_comb)')
+# Show the DataFrame schema and a preview of the data
+df.printSchema()
+df.show()
 
-# Adding benchmark points using rectangular markers
-for idx, row in benchmark_df.iterrows():
-    tech_index = tech_types.index(row['Tech'])
-    # MSRP benchmark rectangle
-    ax.scatter(tech_index, row['msrp'], color='red', s=300, edgecolor='black', marker='s', linewidth=1, label=f'MSRP Benchmark for {row["Tech"]}' if idx == 0 else "")
-    # Fuel efficiency benchmark rectangle
-    ax.scatter(tech_index, row['fe_comb'], color='purple', s=300, edgecolor='black', marker='s', linewidth=1, label=f'fe_comb Benchmark for {row["Tech"]}' if idx == 0 else "")
-
-# Adjusting x-axis to show tech types correctly
-ax.set_xticks(range(len(tech_types)))
-ax.set_xticklabels(tech_types)
-
-# Setting plot titles and labels
-ax.set_title('MSRP and Fuel Efficiency with Benchmark Rectangles')
-ax.set_xlabel('Technology')
-ax.set_ylabel('Value')
-ax.legend()
-ax.grid(True)
-
-plt.show()
+# Stop the Spark session
+spark.stop()
