@@ -6,24 +6,28 @@ import numpy as np
 # ev_df = pd.read_csv('path_to_your_data.csv')  # Uncomment and modify with your actual data path
 # and_filtered_df = pd.read_csv('path_to_your_benchmark_data.csv')  # Load benchmark data
 
-# Filter out data for the Tech types we're interested in
-tech_types = ['BEV_200', 'BEV_300', 'BEV_400']
+# Define all Tech types, but benchmarks are only for the last five
+tech_types = ['BEV_100', 'BEV_150', 'BEV_200', 'BEV_250', 'BEV_300', 'BEV_350', 'BEV_400', 'BEV_450']
 filtered_df = ev_df[ev_df['Tech'].isin(tech_types)]
+
+# Only last five Techs need benchmarks
+techs_with_benchmarks = tech_types[-5:]  # Adjust this slice based on your exact needs
 
 def plot_bubble_chart(y_column, title, ylabel):
     plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
-    tech_positions = {tech: i for i, tech in enumerate(tech_types, start=1)}  # Position techs numerically for plotting
+    tech_positions = {tech: i+1 for i, tech in enumerate(tech_types)}  # Position techs numerically for plotting
 
-    # Draw benchmark lines from another dataset
-    for tech in tech_types:
+    # Draw benchmark lines for the last five techs only
+    for tech in techs_with_benchmarks:
         benchmark = and_filtered_df[and_filtered_df['Tech'] == tech]
         if not benchmark.empty:
+            position = (tech_positions[tech]-0.5)/len(tech_types), (tech_positions[tech]+0.5)/len(tech_types)
             if y_column == 'MSRP':
-                ax.axhline(y=benchmark['msrp'].values[0], xmin=(tech_positions[tech]-0.3)/len(tech_types), xmax=(tech_positions[tech]+0.3)/len(tech_types), color='r', linestyle='-', linewidth=2)
+                ax.axhline(y=benchmark['msrp'].values[0], xmin=position[0], xmax=position[1], color='r', linestyle='-', linewidth=2)
             else:
-                ax.axhline(y=benchmark['fe_comb'].values[0], xmin=(tech_positions[tech]-0.3)/len(tech_types), xmax=(tech_positions[tech]+0.3)/len(tech_types), color='r', linestyle='-', linewidth=2)
+                ax.axhline(y=benchmark['fe_comb'].values[0], xmin=position[0], xmax=position[1], color='r', linestyle='-', linewidth=2)
 
     for tech in tech_types:
         subset = filtered_df[filtered_df['Tech'] == tech]
