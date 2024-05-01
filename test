@@ -1,0 +1,35 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Assume ev_df is already loaded with the appropriate columns
+# ev_df = pd.read_csv('path_to_your_data.csv')  # You would use this line to load your data
+
+# Filter out data for the Tech types we're interested in
+tech_types = ['BEV_200', 'BEV_300', 'BEV_400']
+filtered_df = ev_df[ev_df['Tech'].isin(tech_types)]
+
+# Plotting MSRP vs. Tech with total_sales as bubble size
+plt.figure(figsize=(10, 6))
+for tech in tech_types:
+    subset = filtered_df[filtered_df['Tech'] == tech]
+    plt.scatter([tech] * len(subset), subset['MSRP'], s=subset['total_sales'], alpha=0.5, label=tech)
+
+plt.xlabel('Technology')
+plt.ylabel('MSRP ($)')
+plt.title('MSRP by BEV Technology with Sales Volume as Bubble Size')
+plt.legend(title='BEV Tech')
+plt.grid(True)
+plt.show()
+
+# Plotting fe_comb vs. Tech with total_sales as bubble size
+plt.figure(figsize=(10, 6))
+for tech in tech_types:
+    subset = filtered_df[filtered_df['Tech'] == tech]
+    plt.scatter([tech] * len(subset), subset['fe_comb'], s=subset['total_sales'], alpha=0.5, label=tech)
+
+plt.xlabel('Technology')
+plt.ylabel('Fuel Efficiency (wh/mile)')
+plt.title('Fuel Efficiency by BEV Technology with Sales Volume as Bubble Size')
+plt.legend(title='BEV Tech')
+plt.grid(True)
+plt.show()
