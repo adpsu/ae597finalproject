@@ -4,6 +4,7 @@ import numpy as np
 
 # Assuming ev_df is already loaded with the appropriate columns
 # ev_df = pd.read_csv('path_to_your_data.csv')  # Uncomment and modify with your actual data path
+# and_filtered_df = pd.read_csv('path_to_your_benchmark_data.csv')  # Load benchmark data
 
 # Filter out data for the Tech types we're interested in
 tech_types = ['BEV_200', 'BEV_300', 'BEV_400']
@@ -13,6 +14,14 @@ def plot_bubble_chart(y_column, title, ylabel):
     plt.figure(figsize=(12, 8))
     ax = plt.gca()
     
+    # Draw benchmark lines from another dataset
+    for tech in tech_types:
+        benchmark = and_filtered_df[and_filtered_df['Tech'] == tech]
+        if y_column == 'MSRP':
+            ax.axhline(y=benchmark['msrp'].values[0], color='r', linestyle='-', linewidth=2)
+        else:
+            ax.axhline(y=benchmark['fe_comb'].values[0], color='r', linestyle='-', linewidth=2)
+
     for tech in tech_types:
         subset = filtered_df[filtered_df['Tech'] == tech]
         sizes_scaled = subset['total_sales'] / 2  # Scale down the size by half
@@ -23,9 +32,11 @@ def plot_bubble_chart(y_column, title, ylabel):
             largest = subset.loc[subset['total_sales'].idxmax()]
             smallest = subset.loc[subset['total_sales'].idxmin()]
             ax.annotate(largest['Best Match MSRP'], (tech, largest[y_column]), xytext=(40,-10),
-                        textcoords="offset points", ha='right', arrowprops=dict(arrowstyle="->"))
+                        textcoords="offset points", ha='right', 
+                        arrowprops=dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=-105,rad=10"))
             ax.annotate(smallest['Best Match MSRP'], (tech, smallest[y_column]), xytext=(40,10),
-                        textcoords="offset points", ha='right', arrowprops=dict(arrowstyle="->"))
+                        textcoords="offset points", ha='right', 
+                        arrowprops=dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=105,rad=10"))
 
     plt.xlabel('Technology')
     plt.ylabel(ylabel)
