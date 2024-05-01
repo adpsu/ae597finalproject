@@ -1,9 +1,11 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import input_file_name, regexp_extract, sum as _sum
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # Create a Spark session
 spark = SparkSession.builder \
-    .appName("Aggregate Values by Geography") \
+    .appName("Aggregate and Plot") \
     .getOrCreate()
 
 # Define the base directory
@@ -25,9 +27,18 @@ df = df.withColumn("charger_type", regexp_extract("file_path", "metric=([^/]+)",
 # Group by 'geography' and sum the 'value'
 aggregated_df = df.groupBy("geography").agg(_sum("value").alias("total_value"))
 
-# Show the result
-aggregated_df.show()
+# Convert to Pandas DataFrame
+pandas_df = aggregated_df.toPandas()
+
+# Plotting
+plt.figure(figsize=(10, 6))
+plt.boxplot(pandas_df['total_value'])
+plt.title('Box Plot of Total Values by Geography')
+plt.ylabel('Total Value')
+plt.xlabel('Geography')
+plt.xticks([1], pandas_df['geography'])  # Adjust depending on the number of unique geographies
+plt.grid(True)
+plt.show()
 
 # Stop the Spark session
 spark.stop()
-
