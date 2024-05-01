@@ -1,9 +1,9 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import input_file_name, regexp_extract
+from pyspark.sql.functions import input_file_name, regexp_extract, sum as _sum
 
 # Create a Spark session
 spark = SparkSession.builder \
-    .appName("Load and Modify Parquet Files") \
+    .appName("Aggregate Values by Geography") \
     .getOrCreate()
 
 # Define the base directory
@@ -12,15 +12,22 @@ base_directory = "/path/to/model_year=2050/"
 # Load Parquet files from directories that match the pattern
 df = spark.read.parquet(base_directory + "subsector=Personal_LDV+*/metric=*/")
 
-# Extract 'vehicle_type' from the file path
+# Add a column with the file path using input_file_name
 df = df.withColumn("file_path", input_file_name())
+
+# Extract 'vehicle_type' from the file path
 df = df.withColumn("vehicle_type", regexp_extract("file_path", "subsector=Personal_LDV\+([^/]+)", 1))
 
 # Extract 'charger_type' from the file path
 df = df.withColumn("charger_type", regexp_extract("file_path", "metric=([^/]+)", 1))
 
-# Show the DataFrame schema and a preview of the data
-df.select("vehicle_type", "charger_type").show()
+# Assuming the DataFrame already has a column named 'value' and 'geography'
+# Group by 'geography' and sum the 'value'
+aggregated_df = df.groupBy("geography").agg(_sum("value").alias("total_value"))
+
+# Show the result
+aggregated_df.show()
 
 # Stop the Spark session
 spark.stop()
+
