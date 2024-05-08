@@ -1,42 +1,32 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import input_file_name, regexp_extract, sum as _sum
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Create a Spark session
-spark = SparkSession.builder \
-    .appName("Aggregate and Plot") \
-    .getOrCreate()
+# Example DataFrames, replace with your actual DataFrames
+# df1, df2, df3
 
-# Define the base directory
-base_directory = "/path/to/model_year=2050/"
+# Convert 'total_value' from kWh to GWh in each DataFrame
+df1['total_value'] = df1['total_value'] / 1_000_000
+df2['total_value'] = df2['total_value'] / 1_000_000
+df3['total_value'] = df3['total_value'] / 1_000_000
 
-# Load Parquet files from directories that match the pattern
-df = spark.read.parquet(base_directory + "subsector=Personal_LDV+*/metric=*/")
+# Combine the 'total_value' columns into a list of arrays for plotting
+# Using .values to get numpy arrays from pandas series
+data_to_plot = [df1['total_value'].values, df2['total_value'].values, df3['total_value'].values]
 
-# Add a column with the file path using input_file_name
-df = df.withColumn("file_path", input_file_name())
-
-# Extract 'vehicle_type' from the file path
-df = df.withColumn("vehicle_type", regexp_extract("file_path", "subsector=Personal_LDV\+([^/]+)", 1))
-
-# Extract 'charger_type' from the file path
-df = df.withColumn("charger_type", regexp_extract("file_path", "metric=([^/]+)", 1))
-
-# Assuming the DataFrame already has a column named 'value' and 'geography'
-# Group by 'geography' and sum the 'value'
-aggregated_df = df.groupBy("geography").agg(_sum("value").alias("total_value"))
-
-# Convert to Pandas DataFrame
-pandas_df = aggregated_df.toPandas()
-
-# Plotting
+# Create a figure and axes
 plt.figure(figsize=(10, 6))
-plt.boxplot(pandas_df['total_value'])
-plt.title('Box Plot of Total Values')
-plt.ylabel('Total Value')
-plt.grid(True)
-plt.show()
 
-# Stop the Spark session
-spark.stop()
+# Create the box plot
+plt.boxplot(data_to_plot)
+
+# Setting the x-axis labels to correspond to each DataFrame
+plt.xticks([1, 2, 3], ['DataFrame 1', 'DataFrame 2', 'DataFrame 3'])
+
+# Setting the y-axis label
+plt.ylabel('Total Value (GWh)')
+
+# Adding a title
+plt.title('Comparison of Total Values by DataFrame')
+
+# Show the plot
+plt.show()
