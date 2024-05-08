@@ -1,32 +1,51 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Example DataFrames, replace with your actual DataFrames
-# df1, df2, df3
+# Example DataFrames with a 'total_value' column and the first column as 'geography'
+# Ensure pandas_df_cal, pandas_df_county, pandas_df_state are loaded and prepared
 
 # Convert 'total_value' from kWh to GWh in each DataFrame
-df1['total_value'] = df1['total_value'] / 1_000_000
-df2['total_value'] = df2['total_value'] / 1_000_000
-df3['total_value'] = df3['total_value'] / 1_000_000
+pandas_df_cal['total_value'] = pandas_df_cal['total_value'] / 1_000_000
+pandas_df_county['total_value'] = pandas_df_county['total_value'] / 1_000_000
+pandas_df_state['total_value'] = pandas_df_state['total_value'] / 1_000_000
 
-# Combine the 'total_value' columns into a list of arrays for plotting
-# Using .values to get numpy arrays from pandas series
-data_to_plot = [df1['total_value'].values, df2['total_value'].values, df3['total_value'].values]
+def find_top_outliers(df):
+    # Calculate Q1 and Q3
+    Q1 = df['total_value'].quantile(0.25)
+    Q3 = df['total_value'].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    # Calculate upper bound to identify outliers
+    upper_bound = Q3 + 1.5 * IQR
+    
+    # Filter outliers based on the upper bound
+    outliers = df[df['total_value'] > upper_bound]
+    
+    # Sort the outliers and return the top 2
+    return outliers.sort_values(by='total_value', ascending=False).head(2)
 
-# Create a figure and axes
+# Collect the top 2 outliers for each DataFrame
+outliers_df_cal = find_top_outliers(pandas_df_cal)
+outliers_df_county = find_top_outliers(pandas_df_county)
+outliers_df_state = find_top_outliers(pandas_df_state)
+
+# Plotting
 plt.figure(figsize=(10, 6))
+bp = plt.boxplot([pandas_df_cal['total_value'], pandas_df_county['total_value'], pandas_df_state['total_value']], labels=['California', 'County', 'State'])
 
-# Create the box plot
-plt.boxplot(data_to_plot)
+# Function to annotate outliers
+def annotate_outliers(data, outliers, idx):
+    for i, row in outliers.iterrows():
+        y = row['total_value']
+        x = idx
+        # Use iloc[0] to dynamically access the first column regardless of its name
+        plt.annotate(row.iloc[0], (x, y), textcoords="offset points", xytext=(0,10), ha='center')
 
-# Setting the x-axis labels to correspond to each DataFrame
-plt.xticks([1, 2, 3], ['DataFrame 1', 'DataFrame 2', 'DataFrame 3'])
+# Annotate outliers for each DataFrame
+annotate_outliers(pandas_df_cal, outliers_df_cal, 1)
+annotate_outliers(pandas_df_county, outliers_df_county, 2)
+annotate_outliers(pandas_df_state, outliers_df_state, 3)
 
-# Setting the y-axis label
 plt.ylabel('Total Value (GWh)')
-
-# Adding a title
-plt.title('Comparison of Total Values by DataFrame')
-
-# Show the plot
+plt.title('Comparison of Total Values by DataFrame with Outliers Annotated')
 plt.show()
