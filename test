@@ -1,23 +1,34 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
-# Assuming df1 and df2 are already defined
+# Assume DataFrames are loaded and columns 'total_value' and 'total_hh' are prepared
 
-# Convert all columns to numeric
-for column in df1.columns:
-    df1[column] = pd.to_numeric(df1[column], errors='coerce')
-for column in df2.columns:
-    df2[column] = pd.to_numeric(df2[column], errors='coerce')
+# Plotting with dual y-axes
+fig, ax1 = plt.subplots(figsize=(10, 6))
 
-# Merge the DataFrames on "county code"
-merged_df = pd.merge(df1, df2, on="county code", how='outer', indicator=True)
+# Colors for the plot
+colors = ['black', 'blue']
 
-# Print and drop unmerged rows
-print("Rows that didn't merge successfully:")
-print(merged_df[merged_df['_merge'] != 'both'])
+# First y-axis (left)
+# Convert 'total_value' from kWh to GWh in each DataFrame
+data_gwh = [df['total_value'] / 1_000_000 for df in [pandas_df_cal, pandas_df_county, pandas_df_state]]
+bp1 = ax1.boxplot(data_gwh, positions=[1, 4, 7], widths=0.6, patch_artist=True, boxprops=dict(facecolor=colors[0]))
 
-# Keep only the successfully merged rows and drop the merge indicator column
-merged_df = merged_df[merged_df['_merge'] == 'both'].drop(columns=['_merge'])
+# Set the labels and colors for the first y-axis
+ax1.set_ylabel('Total Value (GWh)', color=colors[0])
+ax1.tick_params(axis='y', labelcolor=colors[0])
+ax1.set_xticks([2, 5, 8])
+ax1.set_xticklabels(['California', 'County', 'State'])
 
-# Display the cleaned DataFrame
-print("Cleaned Merged DataFrame:")
-print(merged_df)
+# Second y-axis (right)
+ax2 = ax1.twinx()
+data_hh = [df['total_hh'] for df in [pandas_df_cal, pandas_df_county, pandas_df_state]]
+bp2 = ax2.boxplot(data_hh, positions=[2, 5, 8], widths=0.6, patch_artist=True, boxprops=dict(facecolor=colors[1]))
+
+# Set the labels and colors for the second y-axis
+ax2.set_ylabel('Total Household (Units)', color=colors[1])
+ax2.tick_params(axis='y', labelcolor=colors[1])
+
+# Title and show
+plt.title('Comparison of Total Values and Household Units by DataFrame')
+plt.show()
