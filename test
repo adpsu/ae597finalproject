@@ -1,34 +1,39 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.path as mpath
 
-# Assume DataFrames are loaded and columns 'total_value' and 'total_hh' are prepared
+# Define the rectangle marker
+# Specify the vertices of the rectangle (four corners)
+rect_vertices = [
+    (-0.5, -0.2), # Bottom-left
+    (-0.5, 0.2),  # Top-left
+    (0.5, 0.2),   # Top-right
+    (0.5, -0.2),  # Bottom-right
+    (0., 0.),     # Ignored, needed for the 'closepoly' command
+]
 
-# Plotting with dual y-axes
-fig, ax1 = plt.subplots(figsize=(10, 6))
+# Commands to create the path
+rect_codes = [
+    mpath.Path.MOVETO,  # Move to bottom-left
+    mpath.Path.LINETO,  # Line to top-left
+    mpath.Path.LINETO,  # Line to top-right
+    mpath.Path.LINETO,  # Line to bottom-right
+    mpath.Path.CLOSEPOLY, # Close the polygon
+]
 
-# Colors for the plot
-colors = ['black', 'blue']
+# Create the Path object
+rect_path = mpath.Path(rect_vertices, rect_codes)
 
-# First y-axis (left)
-# Convert 'total_value' from kWh to GWh in each DataFrame
-data_gwh = [df['total_value'] / 1_000_000 for df in [pandas_df_cal, pandas_df_county, pandas_df_state]]
-bp1 = ax1.boxplot(data_gwh, positions=[1, 4, 7], widths=0.6, patch_artist=True, boxprops=dict(facecolor=colors[0]))
+# Sample data
+x = [1, 2, 3, 4, 5]
+y = [2, 3, 5, 7, 11]
 
-# Set the labels and colors for the first y-axis
-ax1.set_ylabel('Total Value (GWh)', color=colors[0])
-ax1.tick_params(axis='y', labelcolor=colors[0])
-ax1.set_xticks([2, 5, 8])
-ax1.set_xticklabels(['California', 'County', 'State'])
+# Create the scatter plot with the custom rectangle marker
+plt.scatter(x, y, marker=rect_path, s=100, color='b')  # 's' controls the size of the markers
 
-# Second y-axis (right)
-ax2 = ax1.twinx()
-data_hh = [df['total_hh'] for df in [pandas_df_cal, pandas_df_county, pandas_df_state]]
-bp2 = ax2.boxplot(data_hh, positions=[2, 5, 8], widths=0.6, patch_artist=True, boxprops=dict(facecolor=colors[1]))
+# Optional: Add titles and labels
+plt.title('Scatter Plot with Rectangular Markers')
+plt.xlabel('X Axis')
+plt.ylabel('Y Axis')
 
-# Set the labels and colors for the second y-axis
-ax2.set_ylabel('Total Household (Units)', color=colors[1])
-ax2.tick_params(axis='y', labelcolor=colors[1])
-
-# Title and show
-plt.title('Comparison of Total Values and Household Units by DataFrame')
+# Show the plot
 plt.show()
