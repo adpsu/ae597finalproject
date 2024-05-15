@@ -1,96 +1,58 @@
 import pandas as pd
-
-# Assuming df is your DataFrame
-# Calculate National level statistics
-national_stats = df.groupby('year')['total_value'].agg(['mean', 'std']).reset_index()
-
-# Calculate State level statistics
-state_stats = df.groupby(['year', 'state_code'])['total_value'].agg(['mean', 'std']).reset_index()
-
-# Calculate County level statistics
-county_stats = df.groupby(['year', 'geography'])['total_value'].agg(['mean', 'std']).reset_index()
-
-
-
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Setting the style for the plot
-sns.set(style="whitegrid")
+# Assuming df is the dataset loaded as a pandas DataFrame
+# Example structure of df:
+# df = pd.read_csv('your_dataset.csv')
 
-# Plotting function
-def plot_stats(df, x_col, y_col, y_err_col, label, ax):
-    ax.plot(df[x_col], df[y_col], label=label, alpha=0.7)
-    ax.fill_between(df[x_col], df[y_col] - 3*df[y_err_col], df[y_col] + 3*df[y_err_col], alpha=0.1)
+# a) National: total_value for every year
+national_total = df.groupby('year')['total_value'].sum().reset_index()
 
-fig, ax = plt.subplots(figsize=(12, 8))
+# b) State: mean and upper and lower limit at the 99th percentile of total_value for every year
+state_stats = df.groupby(['year', 'state_code'])['total_value'].agg(
+    mean_value='mean',
+    std_value='std',
+    lower_limit=lambda x: np.percentile(x, 0.5),
+    upper_limit=lambda x: np.percentile(x, 99.5)
+).reset_index()
 
-# National plot
-plot_stats(national_stats, 'year', 'mean', 'std', 'National', ax)
+# c) County: mean and upper and lower limit at the 99th percentile of total_value for every year
+county_stats = df.groupby(['year', 'geography'])['total_value'].agg(
+    mean_value='mean',
+    std_value='std',
+    lower_limit=lambda x: np.percentile(x, 0.5),
+    upper_limit=lambda x: np.percentile(x, 99.5)
+).reset_index()
 
-# State plot
+# Plotting
+plt.figure(figsize=(14, 8))
+
+# Plotting National data
+plt.plot(national_total['year'], national_total['total_value'], label='National Total', color='blue')
+
+# Plotting State data
 for state in state_stats['state_code'].unique():
     state_data = state_stats[state_stats['state_code'] == state]
-    plot_stats(state_data, 'year', 'mean', 'std', f'State {state}', ax)
+    plt.plot(state_data['year'], state_data['mean_value'], label=f'State {state} Mean', linestyle='-', alpha=0.5)
+    plt.fill_between(state_data['year'],
+                     state_data['mean_value'] - 3 * state_data['std_value'],
+                     state_data['mean_value'] + 3 * state_data['std_value'],
+                     color='blue', alpha=0.1)
 
-# County plot
+# Plotting County data
 for county in county_stats['geography'].unique():
     county_data = county_stats[county_stats['geography'] == county]
-    plot_stats(county_data, 'year', 'mean', 'std', f'County {county}', ax)
+    plt.plot(county_data['year'], county_data['mean_value'], label=f'County {county} Mean', linestyle='-', alpha=0.3)
+    plt.fill_between(county_data['year'],
+                     county_data['mean_value'] - 3 * county_data['std_value'],
+                     county_data['mean_value'] + 3 * county_data['std_value'],
+                     color='green', alpha=0.1)
 
-# Customize plot
-ax.set_xlabel('Year')
-ax.set_ylabel('Total Value')
-ax.set_title('Mean and ±3SD of Total Value Over Years')
-ax.legend(loc='upper right')
-plt.show()
-
-
-
-
-import pandas as pd
-
-# Assuming df_vehs is your DataFrame
-# a) County stock
-county_stock = df_vehs.groupby(['Year', 'county_fips'])['vehs'].sum().reset_index()
-
-# b) State stock
-state_stock = df_vehs.groupby(['Year', 'state_fips'])['vehs'].sum().reset_index()
-
-# c) CA stock (where state_fips = 6)
-ca_stock = df_vehs[df_vehs['state_fips'] == 6].groupby(['Year', 'county_fips'])['vehs'].sum().reset_index()
-
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Setting the style for the plot
-sns.set(style="whitegrid")
-
-# Plotting function for vehicle stock
-def plot_stock(df, x_col, y_col, label, ax):
-    ax.plot(df[x_col], df[y_col], label=label, alpha=0.7)
-
-fig, ax = plt.subplots(figsize=(12, 8))
-
-# County stock plot
-for county in county_stock['county_fips'].unique():
-    county_data = county_stock[county_stock['county_fips'] == county]
-    plot_stock(county_data, 'Year', 'vehs', f'County {county}', ax)
-
-# State stock plot
-for state in state_stock['state_fips'].unique():
-    state_data = state_stock[state_stock['state_fips'] == state]
-    plot_stock(state_data, 'Year', 'vehs', f'State {state}', ax)
-
-# CA stock plot
-for county in ca_stock['county_fips'].unique():
-    ca_data = ca_stock[ca_stock['county_fips'] == county]
-    plot_stock(ca_data, 'Year', 'vehs', f'CA County {county}', ax)
-
-# Customize plot
-ax.set_xlabel('Year')
-ax.set_ylabel('Vehicle Stock')
-ax.set_title('Aggregate Vehicle Stock Over Years')
-ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1))
+# Plot enhancements
+plt.xlabel('Year')
+plt.ylabel('Total Value')
+plt.title('Total Value by Year with 3 SD Uncertainty Bands')
+plt.legend()
+plt.grid(True)
 plt.show()
