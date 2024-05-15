@@ -1,39 +1,96 @@
+import pandas as pd
+
+# Assuming df is your DataFrame
+# Calculate National level statistics
+national_stats = df.groupby('year')['total_value'].agg(['mean', 'std']).reset_index()
+
+# Calculate State level statistics
+state_stats = df.groupby(['year', 'state_code'])['total_value'].agg(['mean', 'std']).reset_index()
+
+# Calculate County level statistics
+county_stats = df.groupby(['year', 'geography'])['total_value'].agg(['mean', 'std']).reset_index()
+
+
+
 import matplotlib.pyplot as plt
-import matplotlib.path as mpath
+import seaborn as sns
 
-# Define the rectangle marker
-# Specify the vertices of the rectangle (four corners)
-rect_vertices = [
-    (-0.5, -0.2), # Bottom-left
-    (-0.5, 0.2),  # Top-left
-    (0.5, 0.2),   # Top-right
-    (0.5, -0.2),  # Bottom-right
-    (0., 0.),     # Ignored, needed for the 'closepoly' command
-]
+# Setting the style for the plot
+sns.set(style="whitegrid")
 
-# Commands to create the path
-rect_codes = [
-    mpath.Path.MOVETO,  # Move to bottom-left
-    mpath.Path.LINETO,  # Line to top-left
-    mpath.Path.LINETO,  # Line to top-right
-    mpath.Path.LINETO,  # Line to bottom-right
-    mpath.Path.CLOSEPOLY, # Close the polygon
-]
+# Plotting function
+def plot_stats(df, x_col, y_col, y_err_col, label, ax):
+    ax.plot(df[x_col], df[y_col], label=label, alpha=0.7)
+    ax.fill_between(df[x_col], df[y_col] - 3*df[y_err_col], df[y_col] + 3*df[y_err_col], alpha=0.1)
 
-# Create the Path object
-rect_path = mpath.Path(rect_vertices, rect_codes)
+fig, ax = plt.subplots(figsize=(12, 8))
 
-# Sample data
-x = [1, 2, 3, 4, 5]
-y = [2, 3, 5, 7, 11]
+# National plot
+plot_stats(national_stats, 'year', 'mean', 'std', 'National', ax)
 
-# Create the scatter plot with the custom rectangle marker
-plt.scatter(x, y, marker=rect_path, s=100, color='b')  # 's' controls the size of the markers
+# State plot
+for state in state_stats['state_code'].unique():
+    state_data = state_stats[state_stats['state_code'] == state]
+    plot_stats(state_data, 'year', 'mean', 'std', f'State {state}', ax)
 
-# Optional: Add titles and labels
-plt.title('Scatter Plot with Rectangular Markers')
-plt.xlabel('X Axis')
-plt.ylabel('Y Axis')
+# County plot
+for county in county_stats['geography'].unique():
+    county_data = county_stats[county_stats['geography'] == county]
+    plot_stats(county_data, 'year', 'mean', 'std', f'County {county}', ax)
 
-# Show the plot
+# Customize plot
+ax.set_xlabel('Year')
+ax.set_ylabel('Total Value')
+ax.set_title('Mean and ±3SD of Total Value Over Years')
+ax.legend(loc='upper right')
+plt.show()
+
+
+
+
+import pandas as pd
+
+# Assuming df_vehs is your DataFrame
+# a) County stock
+county_stock = df_vehs.groupby(['Year', 'county_fips'])['vehs'].sum().reset_index()
+
+# b) State stock
+state_stock = df_vehs.groupby(['Year', 'state_fips'])['vehs'].sum().reset_index()
+
+# c) CA stock (where state_fips = 6)
+ca_stock = df_vehs[df_vehs['state_fips'] == 6].groupby(['Year', 'county_fips'])['vehs'].sum().reset_index()
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Setting the style for the plot
+sns.set(style="whitegrid")
+
+# Plotting function for vehicle stock
+def plot_stock(df, x_col, y_col, label, ax):
+    ax.plot(df[x_col], df[y_col], label=label, alpha=0.7)
+
+fig, ax = plt.subplots(figsize=(12, 8))
+
+# County stock plot
+for county in county_stock['county_fips'].unique():
+    county_data = county_stock[county_stock['county_fips'] == county]
+    plot_stock(county_data, 'Year', 'vehs', f'County {county}', ax)
+
+# State stock plot
+for state in state_stock['state_fips'].unique():
+    state_data = state_stock[state_stock['state_fips'] == state]
+    plot_stock(state_data, 'Year', 'vehs', f'State {state}', ax)
+
+# CA stock plot
+for county in ca_stock['county_fips'].unique():
+    ca_data = ca_stock[ca_stock['county_fips'] == county]
+    plot_stock(ca_data, 'Year', 'vehs', f'CA County {county}', ax)
+
+# Customize plot
+ax.set_xlabel('Year')
+ax.set_ylabel('Vehicle Stock')
+ax.set_title('Aggregate Vehicle Stock Over Years')
+ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1))
 plt.show()
