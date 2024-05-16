@@ -1,58 +1,22 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
-# Assuming df is the dataset loaded as a pandas DataFrame
-# Example structure of df:
-# df = pd.read_csv('your_dataset.csv')
+# Load the original CSV file
+df = pd.read_csv('your_file.csv')
 
-# a) National: total_value for every year
-national_total = df.groupby('year')['total_value'].sum().reset_index()
+# Filter where total_sales != 0
+filtered_sales_df = df[df['total_sales'] != 0]
 
-# b) State: mean and upper and lower limit at the 99th percentile of total_value for every year
-state_stats = df.groupby(['year', 'state_code'])['total_value'].agg(
-    mean_value='mean',
-    std_value='std',
-    lower_limit=lambda x: np.percentile(x, 0.5),
-    upper_limit=lambda x: np.percentile(x, 99.5)
-).reset_index()
+# Group by year and Tech, then count the rows
+grouped_sales_df = filtered_sales_df.groupby(['year', 'Tech']).size().reset_index(name='count')
 
-# c) County: mean and upper and lower limit at the 99th percentile of total_value for every year
-county_stats = df.groupby(['year', 'geography'])['total_value'].agg(
-    mean_value='mean',
-    std_value='std',
-    lower_limit=lambda x: np.percentile(x, 0.5),
-    upper_limit=lambda x: np.percentile(x, 99.5)
-).reset_index()
+# Save the result to a new CSV file
+grouped_sales_df.to_csv('filtered_total_sales.csv', index=False)
 
-# Plotting
-plt.figure(figsize=(14, 8))
+# Additional filter where total_sales != 0 and MSRP != 0
+filtered_sales_msrp_df = df[(df['total_sales'] != 0) & (df['MSRP'] != 0)]
 
-# Plotting National data
-plt.plot(national_total['year'], national_total['total_value'], label='National Total', color='blue')
+# Group by year and Tech, then count the rows
+grouped_sales_msrp_df = filtered_sales_msrp_df.groupby(['year', 'Tech']).size().reset_index(name='count')
 
-# Plotting State data
-for state in state_stats['state_code'].unique():
-    state_data = state_stats[state_stats['state_code'] == state]
-    plt.plot(state_data['year'], state_data['mean_value'], label=f'State {state} Mean', linestyle='-', alpha=0.5)
-    plt.fill_between(state_data['year'],
-                     state_data['mean_value'] - 3 * state_data['std_value'],
-                     state_data['mean_value'] + 3 * state_data['std_value'],
-                     color='blue', alpha=0.1)
-
-# Plotting County data
-for county in county_stats['geography'].unique():
-    county_data = county_stats[county_stats['geography'] == county]
-    plt.plot(county_data['year'], county_data['mean_value'], label=f'County {county} Mean', linestyle='-', alpha=0.3)
-    plt.fill_between(county_data['year'],
-                     county_data['mean_value'] - 3 * county_data['std_value'],
-                     county_data['mean_value'] + 3 * county_data['std_value'],
-                     color='green', alpha=0.1)
-
-# Plot enhancements
-plt.xlabel('Year')
-plt.ylabel('Total Value')
-plt.title('Total Value by Year with 3 SD Uncertainty Bands')
-plt.legend()
-plt.grid(True)
-plt.show()
+# Save the result to another new CSV file
+grouped_sales_msrp_df.to_csv('filtered_total_sales_msrp.csv', index=False)
