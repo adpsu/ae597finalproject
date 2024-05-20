@@ -1,27 +1,16 @@
 import pandas as pd
 
-# Load the CSV file
-df = pd.read_csv('path/to/your/file.csv')
-
-# Group by year and baseModel and check if all Tech types have non-zero total_sales
-grouped = df.groupby(['year', 'baseModel']).filter(lambda x: (x['total_sales'] != 0).all())
-
-# Count unique rows of baseModel where total_sales of every type of Tech is != 0 for every year
-count_unique_baseModel = grouped.groupby(['year', 'baseModel']).size().reset_index(name='count')
-
-# Save to CSV
-count_unique_baseModel.to_csv('count_unique_baseModel.csv', index=False)
-
-# For the second CSV, filter out rows where MSRP is zero
-df_non_zero_msrp = df[df['MSRP'] != 0]
-
-# Group by year and baseModel and check if all Tech types have non-zero total_sales
-grouped_non_zero_msrp = df_non_zero_msrp.groupby(['year', 'baseModel']).filter(lambda x: (x['total_sales'] != 0).all())
-
-# Count unique rows of baseModel where total_sales of every type of Tech is != 0 for every year where MSRP != 0
-count_unique_baseModel_non_zero_msrp = grouped_non_zero_msrp.groupby(['year', 'baseModel']).size().reset_index(name='count')
-
-# Save to CSV
-count_unique_baseModel_non_zero_msrp.to_csv('count_unique_baseModel_non_zero_msrp.csv', index=False)
-
-print("CSV files have been created successfully.")
+# Sample DataFrame
+data = {
+    'make': ['Toyota', 'Ford', 'Chevrolet', 'BMW', 'Tesla'],
+    'model': ['Camry', 'F-150', 'Malibu', 'X5', 'Model 3'],
+    'MSRP': [24000, 0, 22000, 0, 35000],
+    'vehicle_type': ['Sedan', 'Truck', 'Sedan', 'SUV', 'Sedan']
+}
+df = pd.DataFrame(data)
+msrp_zero = df[df['MSRP'] == 0]
+print(msrp_zero)
+for index, row in msrp_zero.iterrows():
+    print(f"Updating MSRP for {row['make']} {row['model']}")
+    new_msrp = float(input(f"Enter new MSRP for {row['make']} {row['model']}: "))
+    df.at[index, 'MSRP'] = new_msrp
