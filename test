@@ -1,16 +1,14 @@
-import pandas as pd
+Subject: Fall 2024 Internship Hours
 
-# Sample DataFrame
-data = {
-    'make': ['Toyota', 'Ford', 'Chevrolet', 'BMW', 'Tesla'],
-    'model': ['Camry', 'F-150', 'Malibu', 'X5', 'Model 3'],
-    'MSRP': [24000, 0, 22000, 0, 35000],
-    'vehicle_type': ['Sedan', 'Truck', 'Sedan', 'SUV', 'Sedan']
-}
-df = pd.DataFrame(data)
-msrp_zero = df[df['MSRP'] == 0]
-print(msrp_zero)
-for index, row in msrp_zero.iterrows():
-    print(f"Updating MSRP for {row['make']} {row['model']}")
-    new_msrp = float(input(f"Enter new MSRP for {row['make']} {row['model']}: "))
-    df.at[index, 'MSRP'] = new_msrp
+Hi Mari,
+
+I hope you are doing well.
+
+I am writing to discuss the possibility of adjusting my internship hours for Fall 2024. I have previously worked as a GA at my university's HPC center, and one of my mentors has reached out to ask if I could work with them for 20 hours a week in the fall, as other experienced GAs are graduating this summer.
+
+Given this opportunity, I wanted to explore whether it would be possible to reduce my internship hours to 20 hours per week. Could you please help me understand any potential consequences of this adjustment? I have had an initial discussion with Bo, and we want to ensure we understand the rules and regulations before moving forward.
+
+Thank you for your assistance.
+
+Best regards,  
+[Your Name]
