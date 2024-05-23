@@ -15,6 +15,8 @@ def reindex_df(df, weight_col):
 
 def annotate_outliers(ax, df, energy_col, label_col, label):
     """Annotate the top two outliers for a given DataFrame."""
+    # Convert the energy column to numeric
+    df[energy_col] = pd.to_numeric(df[energy_col], errors='coerce')
     sorted_df = df.sort_values(by=energy_col, ascending=False)
     for i in range(min(2, len(sorted_df))):
         value = sorted_df.iloc[i][energy_col]
@@ -50,8 +52,9 @@ def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, nat
         ax.set_ylabel(ylabel)
         ax.set_xlabel('')
         
-        # Annotate the top two outliers for State and CA
-        annotate_outliers(ax, df_state, energy_col, 'state_code_x', 'State')
+        # Annotate the top two outliers for State, County, and CA
+        annotate_outliers(ax, df_state, energy_col, 'state_code', 'State')
+        annotate_outliers(ax, df_county, energy_col, 'state_code_x', 'County')
         annotate_outliers(ax, df_ca, energy_col, 'geography', 'CA')
 
     # Create subplots
@@ -65,9 +68,6 @@ def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, nat
     # Set the main title
     fig.suptitle(title)
 
-    # Add a single xlabel for all subplots
-    fig.text(0.5, 0.04, '', ha='center')
-
     # Add legend for the national average line
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper right')
@@ -79,7 +79,7 @@ def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, nat
 # Example usage
 data_state = {
     'year': [2030, 2030, 2040, 2040, 2050, 2050],
-    'state_code_x': ['CA', 'TX', 'CA', 'TX', 'CA', 'TX'],
+    'state_code': ['CA', 'TX', 'CA', 'TX', 'CA', 'TX'],
     'geography': ['001', '002', '001', '002', '001', '002'],
     'total_hh': [2.2e+02, 2.3e+06, 2.2e+05, 2.1e+06, 2.2e+06, 2.0e+07],
     'energy_per_hh': [300, 400, 350, 450, 370, 420]
