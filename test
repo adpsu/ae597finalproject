@@ -1,14 +1,98 @@
-Subject: Fall 2024 Internship Hours
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-Hi Mari,
+def create_weighted_column(df, weight_col, scale_factor=1000):
+    """Create a new weighted column by scaling down the total_hh values."""
+    df['weighted_col'] = (df[weight_col] / scale_factor).round().astype(int)
+    return df
 
-I hope you are doing well.
+def reindex_df(df, weight_col):
+    """Expand the DataFrame to prepare for resampling. Result is 1 row per count per sample."""
+    df = df.reindex(df.index.repeat(df[weight_col]))
+    df.reset_index(drop=True, inplace=True)
+    return df
 
-I am writing to discuss the possibility of adjusting my internship hours for Fall 2024. I have previously worked as a GA at my university's HPC center, and one of my mentors has reached out to ask if I could work with them for 20 hours a week in the fall, as other experienced GAs are graduating this summer.
+def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, national_total, energy_col, ylabel, title):
+    # Scale down the total_hh values and create a weighted column
+    merged_state_df = create_weighted_column(merged_state_df, 'total_hh')
+    merged_county_df = create_weighted_column(merged_county_df, 'total_hh')
+    merged_ca_df = create_weighted_column(merged_ca_df, 'total_hh')
 
-Given this opportunity, I wanted to explore whether it would be possible to reduce my internship hours to 20 hours per week. Could you please help me understand any potential consequences of this adjustment? I have had an initial discussion with Bo, and we want to ensure we understand the rules and regulations before moving forward.
+    # Function to plot box plots
+    def plot_box_plots(year, ax):
+        df_state = reindex_df(merged_state_df[merged_state_df['year'] == year], 'weighted_col')
+        df_county = reindex_df(merged_county_df[merged_county_df['year'] == year], 'weighted_col')
+        df_ca = reindex_df(merged_ca_df[merged_ca_df['year'] == year], 'weighted_col')
 
-Thank you for your assistance.
+        data_to_plot = {
+            'State': df_state[energy_col],
+            'County': df_county[energy_col],
+            'CA': df_ca[energy_col]
+        }
+        plot_df = pd.DataFrame(data_to_plot)
 
-Best regards,  
-[Your Name]
+        sns.boxplot(data=plot_df, ax=ax)
+        ax.axhline(y=national_total[national_total['year'] == year][energy_col].values[0], color='red', linestyle='--')
+        ax.set_title(f'Year {year}')
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel('')
+
+    # Create subplots
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
+
+    # Plot box plots for each year
+    years = [2030, 2040, 2050]
+    for i, year in enumerate(years):
+        plot_box_plots(year, axes[i])
+
+    # Add a single xlabel for all subplots
+    fig.text(0.5, 0.04, 'Geography Level', ha='center')
+    fig.suptitle(title)
+
+    # Show plot
+    plt.tight_layout()
+    plt.show()
+
+# Example usage
+data_state = {
+    'year': [2030, 2030, 2040, 2040, 2050, 2050],
+    'state_code_x': ['CA', 'TX', 'CA', 'TX', 'CA', 'TX'],
+    'geography': ['001', '002', '001', '002', '001', '002'],
+    'total_hh': [2.2e+02, 2.3e+06, 2.2e+05, 2.1e+06, 2.2e+06, 2.0e+07],
+    'energy_per_hh': [300, 400, 350, 450, 370, 420]
+}
+merged_state_df = pd.DataFrame(data_state)
+
+data_county = {
+    'year': [2030, 2030, 2040, 2040, 2050, 2050],
+    'state_code_x': ['CA', 'TX', 'CA', 'TX', 'CA', 'TX'],
+    'geography': ['001', '002', '001', '002', '001', '002'],
+    'total_hh': [2.1e+02, 2.1e+06, 2.1e+05, 2.2e+06, 2.1e+06, 1.9e+07],
+    'energy_per_hh': [290, 390, 340, 440, 360, 410]
+}
+merged_county_df = pd.DataFrame(data_county)
+
+data_ca = {
+    'year': [2030, 2030, 2040, 2040, 2050, 2050],
+    'state_code_x': ['CA', 'TX', 'CA', 'TX', 'CA', 'TX'],
+    'geography': ['001', '002', '001', '002', '001', '002'],
+    'total_hh': [2.0e+02, 2.2e+06, 2.0e+05, 2.1e+06, 2.0e+06, 1.8e+07],
+    'energy_per_hh': [295, 395, 345, 445, 365, 415]
+}
+merged_ca_df = pd.DataFrame(data_ca)
+
+national_total = pd.DataFrame({
+    'year': [2030, 2040, 2050],
+    'energy_per_hh': [350, 400, 370]
+})
+
+plot_weighted_box_plots(
+    merged_state_df,
+    merged_county_df,
+    merged_ca_df,
+    national_total,
+    'energy_per_hh',
+    'Energy per HH',
+    'Box Plot of Energy per HH in 2030, 2040, 2050'
+)
