@@ -13,7 +13,7 @@ def reindex_df(df, weight_col):
     df.reset_index(drop=True, inplace=True)
     return df
 
-def annotate_outliers(ax, df, energy_col, label_col, label):
+def annotate_outliers(ax, df, energy_col, label_col, x_position):
     """Annotate the top two outliers for a given DataFrame."""
     # Convert the energy column to numeric
     df[energy_col] = pd.to_numeric(df[energy_col], errors='coerce')
@@ -22,8 +22,8 @@ def annotate_outliers(ax, df, energy_col, label_col, label):
         value = sorted_df.iloc[i][energy_col]
         text = sorted_df.iloc[i][label_col]
         ax.annotate(f'{text}', 
-                    xy=(label, value), 
-                    xytext=(label, value + (i * 10)),  # Adjust the vertical position to prevent overlap
+                    xy=(x_position, value), 
+                    xytext=(x_position, value + (i * 10)),  # Adjust the vertical position to prevent overlap
                     arrowprops=dict(facecolor='black', shrink=0.05))
 
 def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, national_total, energy_col, ylabel, title):
@@ -52,10 +52,13 @@ def plot_weighted_box_plots(merged_state_df, merged_county_df, merged_ca_df, nat
         ax.set_ylabel(ylabel)
         ax.set_xlabel('')
         
+        # Get x positions for the box plots
+        x_positions = range(len(data_to_plot))
+        
         # Annotate the top two outliers for State, County, and CA
-        annotate_outliers(ax, df_state, energy_col, 'state_code', 'State')
-        annotate_outliers(ax, df_county, energy_col, 'state_code_x', 'County')
-        annotate_outliers(ax, df_ca, energy_col, 'geography', 'CA')
+        annotate_outliers(ax, df_state, energy_col, 'state_code', x_positions[0])
+        annotate_outliers(ax, df_county, energy_col, 'state_code_x', x_positions[1])
+        annotate_outliers(ax, df_ca, energy_col, 'geography', x_positions[2])
 
     # Create subplots
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
