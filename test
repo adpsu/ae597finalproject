@@ -1,16 +1,37 @@
-Subject: Request to Reduce Internship Hours
+import pandas as pd
 
-Hello Matteo,
+# Sample DataFrame
+df = pd.DataFrame({
+    'year': [2020, 2020, 2020, 2021, 2021, 2021, 2021],
+    'Best Match Experian Sales': [100, 150, 100, 200, 250, 200, 300],
+    'MSRP': ["NA", 50000, "NA", 30000, "NA", 45000, "NA"],
+    'experian_sales': [10, 15, 10, 20, 25, 20, 30]
+})
 
-I hope you are doing well. I am writing to request your approval to reduce my internship hours to 20 hours per week starting from August 8th (Fall 2024).
+# Create an empty DataFrame to store the results
+result_df = pd.DataFrame()
 
-Before joining NREL, I was working as a Graduate Assistant at Penn State's HPC center, with plans to continue there after my internship ends in December 2024. As an international student, I am not eligible to work with my CPT for more than 12 months. However, the HPC center has requested my assistance from this Fall due to a shortage of Graduate Assistants. 
+# Loop through each unique year in the dataset
+for year in df['year'].unique():
+    # Filter rows for the current year
+    df_year = df[df['year'] == year]
 
-In this context, I was wondering if I could work with TETA for 20 hours per week starting August 8th. I truly enjoy working here and am considering applying for a full-time position at NREL after I graduate in Summer 2024, provided you and your team find my work satisfactory and there is an opening available. For now, I believe it would be beneficial if I could support my team at the HPC center during their time of need.
+    # Identify rows where "MSRP" is "NA"
+    na_msrp_rows = df_year[df_year['MSRP'] == "NA"]
 
-I have had an initial discussion with Bo and considered the potential effects on workloads due to the reduced hours. Please let me know your thoughts and if you have any questions.
+    # Find unique "Best Match Experian Sales" and "experian_sales" counts
+    unique_best_match_sales = na_msrp_rows['Best Match Experian Sales'].value_counts() == 1
+    unique_experian_sales = na_msrp_rows['experian_sales'].value_counts() == 1
 
-Thank you for your understanding.
+    # Get the indices of rows with unique "Best Match Experian Sales" and "experian_sales"
+    unique_indices = na_msrp_rows[
+        na_msrp_rows['Best Match Experian Sales'].isin(unique_best_match_sales[unique_best_match_sales].index) &
+        na_msrp_rows['experian_sales'].isin(unique_experian_sales[unique_experian_sales].index)
+    ].index
 
-Best regards,
-[Your Name]
+    # Append the unique rows to the result DataFrame
+    result_df = pd.concat([result_df, df.loc[unique_indices]])
+
+print("Rows for all years where 'MSRP' is 'NA' and 'Best Match Experian Sales' and 'experian_sales' are unique in that year:")
+print(result_df)
+
