@@ -1,37 +1,45 @@
-import pandas as pd
+Here are the draft emails for CARB and CVRP regarding the historic incentives available in California:
 
-# Sample DataFrame
-df = pd.DataFrame({
-    'year': [2020, 2020, 2020, 2021, 2021, 2021, 2021],
-    'Best Match Experian Sales': [100, 150, 100, 200, 250, 200, 300],
-    'MSRP': ["NA", 50000, "NA", 30000, "NA", 45000, "NA"],
-    'experian_sales': [10, 15, 10, 20, 25, 20, 30]
-})
+### Email to CARB
 
-# Create an empty DataFrame to store the results
-result_df = pd.DataFrame()
+**Subject: Inquiry on Historic BEV and PHEV Incentives in California (2010-Present)**
 
-# Loop through each unique year in the dataset
-for year in df['year'].unique():
-    # Filter rows for the current year
-    df_year = df[df['year'] == year]
+Dear California Air Resources Board,
 
-    # Identify rows where "MSRP" is "NA"
-    na_msrp_rows = df_year[df_year['MSRP'] == "NA"]
+I hope this message finds you well. My name is [Your Name], and I am currently working on a study that evaluates the impact of state-level incentives on the adoption of Battery Electric Vehicles (BEVs) and Plug-in Hybrid Electric Vehicles (PHEVs) in California.
 
-    # Find unique "Best Match Experian Sales" and "experian_sales" counts
-    unique_best_match_sales = na_msrp_rows['Best Match Experian Sales'].value_counts() == 1
-    unique_experian_sales = na_msrp_rows['experian_sales'].value_counts() == 1
+As part of my research, I am seeking detailed information on the historic incentives provided by the state for BEVs and PHEVs from 2010 to the present. This includes, but is not limited to, rebate amounts, eligibility requirements, and any changes to the incentive programs over the years.
 
-    # Get the indices of rows with unique "Best Match Experian Sales" and "experian_sales"
-    unique_indices = na_msrp_rows[
-        na_msrp_rows['Best Match Experian Sales'].isin(unique_best_match_sales[unique_best_match_sales].index) &
-        na_msrp_rows['experian_sales'].isin(unique_experian_sales[unique_experian_sales].index)
-    ].index
+I would greatly appreciate it if you could provide or direct me to the relevant data or reports that outline these incentives. Understanding the evolution of these incentives is crucial for the accuracy and comprehensiveness of my study.
 
-    # Append the unique rows to the result DataFrame
-    result_df = pd.concat([result_df, df.loc[unique_indices]])
+Thank you for your time and assistance. I look forward to your response.
 
-print("Rows for all years where 'MSRP' is 'NA' and 'Best Match Experian Sales' and 'experian_sales' are unique in that year:")
-print(result_df)
+Best regards,
 
+[Your Full Name]  
+[Your Position]  
+[Your Contact Information]
+
+### Email to CVRP
+
+**Subject: Request for Historical Data on CVRP Incentives (2010-Present)**
+
+Dear CVRP Team,
+
+I hope this email finds you well. My name is [Your Name], and I am conducting a study on the impact of state-level incentives on the adoption of Battery Electric Vehicles (BEVs) and Plug-in Hybrid Electric Vehicles (PHEVs) in California.
+
+To ensure the accuracy of my research, I am interested in obtaining detailed historical data on the incentives provided under the Clean Vehicle Rebate Project (CVRP) from 2010 to the present. Specifically, I am looking for information on rebate amounts, eligibility criteria, and any modifications to the program over the years.
+
+Your assistance in providing this information would be invaluable to my study. If there are any reports or databases that include this data, I would be grateful if you could share them with me or guide me on how to access them.
+
+Thank you for your support and cooperation. I look forward to hearing from you soon.
+
+Best regards,
+
+[Your Full Name]  
+[Your Position]  
+[Your Contact Information]
+
+---
+
+Feel free to customize these emails further if needed.
