@@ -57,35 +57,41 @@ merged_df = pd.merge(df, hh_df, on='Year')
 # Calculate the number of EVs per household
 merged_df['EVs_per_Household'] = merged_df['LDV_BEVs'] / merged_df['Households']
 
-# Plotting
-fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+import pandas as pd
+import matplotlib.pyplot as plt
 
-# Baseline Grid
-baseline_grid = merged_df[merged_df['Grid'] == 'Baseline Grid']
-for run in baseline_grid['RunName'].unique():
-    run_data = baseline_grid[baseline_grid['RunName'] == run]
-    axs[0].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
-axs[0].set_title('Baseline Grid')
-axs[0].set_xlabel('Year')
-axs[0].set_ylabel('EVs per Household')
+def plot_metric_per_household(merged_df, metric_column, title, y_axis_name):
+    fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
-# Decarbonized Grid, No Deep Decarbonization
-decarb_no = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'No')]
-for run in decarb_no['RunName'].unique():
-    run_data = decarb_no[decarb_no['RunName'] == run]
-    axs[1].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
-axs[1].set_title('Decarbonized Grid, No Deep Decarbonization')
-axs[1].set_xlabel('Year')
-axs[1].set_ylabel('EVs per Household')
+    # Baseline Grid
+    baseline_grid = merged_df[merged_df['Grid'] == 'Baseline Grid']
+    for run in baseline_grid['RunName'].unique():
+        run_data = baseline_grid[baseline_grid['RunName'] == run]
+        axs[0].plot(run_data['Year'], run_data[metric_column], label=run)
+    axs[0].set_title(f'Baseline Grid - {title}')
+    axs[0].set_xlabel('Year')
+    axs[0].set_ylabel(y_axis_name)
 
-# Decarbonized Grid, Yes Deep Decarbonization
-decarb_yes = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'Yes')]
-for run in decarb_yes['RunName'].unique():
-    run_data = decarb_yes[decarb_yes['RunName'] == run]
-    axs[2].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
-axs[2].set_title('Decarbonized Grid, Yes Deep Decarbonization')
-axs[2].set_xlabel('Year')
-axs[2].set_ylabel('EVs per Household')
+    # Decarbonized Grid, No Deep Decarbonization
+    decarb_no = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'No')]
+    for run in decarb_no['RunName'].unique():
+        run_data = decarb_no[decarb_no['RunName'] == run]
+        axs[1].plot(run_data['Year'], run_data[metric_column], label=run)
+    axs[1].set_title(f'Decarbonized Grid, No Deep Decarbonization - {title}')
+    axs[1].set_xlabel('Year')
+    axs[1].set_ylabel(y_axis_name)
 
-plt.tight_layout()
-plt.show()
+    # Decarbonized Grid, Yes Deep Decarbonization
+    decarb_yes = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'Yes')]
+    for run in decarb_yes['RunName'].unique():
+        run_data = decarb_yes[decarb_yes['RunName'] == run]
+        axs[2].plot(run_data['Year'], run_data[metric_column], label=run)
+    axs[2].set_title(f'Decarbonized Grid, Yes Deep Decarbonization - {title}')
+    axs[2].set_xlabel('Year')
+    axs[2].set_ylabel(y_axis_name)
+
+    plt.tight_layout()
+    plt.show()
+
+# Example usage:
+# plot_metric_per_household(merged_df, 'EVs_per_Household', 'Number of EVs per Household', 'EVs per Household')
