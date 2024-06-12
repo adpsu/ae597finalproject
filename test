@@ -1,26 +1,91 @@
-Here is a summary of the Clean Vehicle Rebate Project (CVRP) rebate amounts for California residents from 2015 to 2023:
+import pandas as pd
+import matplotlib.pyplot as plt
 
-1. **2015-2016**:
-   - Up to $2,500 for Battery Electric Vehicles (BEVs)
-   - Up to $1,500 for Plug-in Hybrid Electric Vehicles (PHEVs)
-   - Up to $5,000 for Fuel Cell Electric Vehicles (FCEVs)
+# Assuming df is your main dataframe and hh_df is the dataframe with 'Year' and 'Households' data
 
-2. **2017**:
-   - The rebate amounts remained consistent with previous years: $2,500 for BEVs, $1,500 for PHEVs, and $5,000 for FCEVs.
+# Description of the columns
+column_descriptions = {
+    'Year': 'The year of the data record.',
+    'Grid': 'Type of grid scenario: "Baseline Grid" or "Decarbonized Grid".',
+    'LDV_ICEVs': 'Number of LDVs with ICEV technology.',
+    'LDV_BEVs': 'Number of LDVs with BEV technology.',
+    'LDV_PHEVs': 'Number of LDVs with PHEV technology.',
+    'LDV_ZEVs': 'Number of LDVs with ZEV technology.',
+    'LDV_FCEVs': 'Number of LDVs with FCEV technology.',
+    'HDV_ICEVs': 'Number of HDVs with ICEV technology.',
+    'HDV_BEVs': 'Number of HDVs with BEV technology.',
+    'HDV_PHEVs': 'Number of HDVs with PHEV technology.',
+    'HDV_ZEVs': 'Number of HDVs with ZEV technology.',
+    'HDV_FCEVs': 'Number of HDVs with FCEV technology.',
+    'LDV_BEV_VMT': 'Total vehicle miles traveled by LDV BEV vehicles.',
+    'LDV_PHEV_VMT': 'Total vehicle miles traveled by LDV PHEV vehicles.',
+    'LDV_BEV_GGE': 'Energy consumed by LDV BEV vehicles in GGE.',
+    'LDV_PHEV_GGE': 'Energy consumed by LDV PHEV vehicles in GGE.',
+    'LDV_ZEV_sales': 'Total sales of LDVs with ZEV technology.',
+    'LDV_FCEV_sales': 'Total sales of LDVs with FCEV technology.',
+    'HDV_ZEV_sales': 'Total sales of HDVs with ZEV technology.',
+    'HDV_FCEV_sales': 'Total sales of HDVs with FCEV technology.',
+    'LDVs': 'Total number of LDVs with all technologies.',
+    'LDVMT': 'Total VMT by all LDVs.',
+    'LDV_PMT': 'Total Passenger Miles Traveled (PMT) in all LDVs.',
+    'HDVs': 'Total number of HDVs with all technologies.',
+    'HDVMT': 'Total VMT by all HDVs.',
+    'HDV_PMT': 'Total Passenger Miles Traveled (PMT) in all HDVs.',
+    'HDV_Ton_Mi': 'Total Ton Miles traveled by all HDVs.',
+    'HDV_sales': 'Total sales of HDV vehicles.',
+    'LDV_sales': 'Total sales of LDV vehicles.',
+    'PMT_MaaS': 'PMT in Mobility as a Service.',
+    'PMT_Air': 'PMT in Air Transit.',
+    'PMT_Transit': 'PMT in all Transit modes.',
+    'TWh_e': 'Total energy consumption in TWh.',
+    'TWh_eRes': 'Total energy consumption in Residences in TWh.',
+    'TWh_eCom': 'Total energy consumption in Commercial sector in TWh.',
+    'TWh_eDCFC': 'Total energy consumption in DC Fast Charging in TWh.',
+    'TWh_eLDV': 'Total energy consumption in LDVs in TWh.',
+    'TWh_ePax': 'Total energy consumption per passenger in TWh.',
+    'eLDVMT': 'Total VMT traveled by LDVs powered by electricity.',
+    'eLDPMT': 'Total PMT traveled by LDVs powered by electricity.',
+    'ePMT': 'Total PMT traveled by all vehicles powered by electricity.',
+    'eTonMi': 'Total Ton Miles traveled by all vehicles powered by electricity.',
+    'deep_decarb_2050': 'Indicator for deep decarbonization in 2050: "Yes" or "No".',
+    'RunName': 'Identifier for each run in a given year and scenario.'
+}
 
-3. **2018-2019**:
-   - Enhanced rebates were introduced for low- and moderate-income consumers, providing up to an additional $2,000 for BEVs and PHEVs.
+# Merge the household data
+merged_df = pd.merge(df, hh_df, on='Year')
 
-4. **2020-2021**:
-   - Standard rebates were up to $2,000 for BEVs, $1,500 for PHEVs, and $4,500 for FCEVs.
-   - Increased rebates of up to $4,500 for BEVs, $3,500 for PHEVs, and $7,000 for FCEVs for low- and moderate-income consumers.
+# Calculate the number of EVs per household
+merged_df['EVs_per_Household'] = merged_df['LDV_BEVs'] / merged_df['Households']
 
-5. **2022**:
-   - Rebates for BEVs up to $2,000, PHEVs up to $1,500, and FCEVs up to $4,500.
-   - Increased rebates for low- and moderate-income applicants remained available.
+# Plotting
+fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
-6. **2023**:
-   - Standard rebates continued: up to $2,000 for BEVs, $1,500 for PHEVs, and $4,500 for FCEVs.
-   - Enhanced rebates for low- and moderate-income consumers offered an additional $2,000.
+# Baseline Grid
+baseline_grid = merged_df[merged_df['Grid'] == 'Baseline Grid']
+for run in baseline_grid['RunName'].unique():
+    run_data = baseline_grid[baseline_grid['RunName'] == run]
+    axs[0].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
+axs[0].set_title('Baseline Grid')
+axs[0].set_xlabel('Year')
+axs[0].set_ylabel('EVs per Household')
 
-The CVRP aimed to promote the adoption of clean vehicles by providing rebates that reduce the initial cost. It targeted both individual consumers and public fleets, with a focus on supporting the state's most vulnerable and pollution-burdened communities【6†source】【7†source】【8†source】.
+# Decarbonized Grid, No Deep Decarbonization
+decarb_no = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'No')]
+for run in decarb_no['RunName'].unique():
+    run_data = decarb_no[decarb_no['RunName'] == run]
+    axs[1].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
+axs[1].set_title('Decarbonized Grid, No Deep Decarbonization')
+axs[1].set_xlabel('Year')
+axs[1].set_ylabel('EVs per Household')
+
+# Decarbonized Grid, Yes Deep Decarbonization
+decarb_yes = merged_df[(merged_df['Grid'] == 'Decarbonized Grid') & (merged_df['deep_decarb_2050'] == 'Yes')]
+for run in decarb_yes['RunName'].unique():
+    run_data = decarb_yes[decarb_yes['RunName'] == run]
+    axs[2].plot(run_data['Year'], run_data['EVs_per_Household'], label=run)
+axs[2].set_title('Decarbonized Grid, Yes Deep Decarbonization')
+axs[2].set_xlabel('Year')
+axs[2].set_ylabel('EVs per Household')
+
+plt.tight_layout()
+plt.show()
