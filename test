@@ -1,1 +1,100 @@
-<._.>
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+# Step 1: Prepare scenario_df
+def convert_label(label):
+    if label.endswith('%'):
+        return float(label.strip('%'))
+    elif label == "Constant":
+        return 0
+    else:
+        return float(label)
+
+# Apply the conversion
+scenario_df['Label'] = scenario_df['Label'].apply(convert_label)
+
+# Filter for specific variables
+variables_of_interest = [
+    "hydrogen_availability_ldv", 
+    "charging_availability_public", 
+    "household_icev_ban", 
+    "vehicle_cost_bev_ldv", 
+    "vehicle_cost_phev_ldv"
+]
+
+# Step 2: Show Distribution
+for variable in variables_of_interest:
+    filtered_df = scenario_df[scenario_df['InputNameID'] == variable]
+    sns.histplot(filtered_df['Label'], kde=True)
+    plt.title(f'Distribution of {variable}')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.show()
+
+# Step 3: Prepare merged_df and plot
+
+
+
+# Function to plot data with uncertainty band
+def plot_uncertainty_band(df, variable, threshold, measure):
+    runids_above_threshold = scenario_df[(scenario_df['InputNameID'] == variable) & (scenario_df['Label'] > threshold)]['RunID']
+    runids_below_threshold = scenario_df[(scenario_df['InputNameID'] == variable) & (scenario_df['Label'] < threshold)]['RunID']
+    
+    df_above = df[df['RunID'].isin(runids_above_threshold)]
+    df_below = df[df['RunID'].isin(runids_below_threshold)]
+    
+    years = df['Year'].unique()
+    
+    # Plot for RunIDs > threshold
+    plt.figure(figsize=(12, 6))
+    
+    upper_bound_above = df_above.groupby('Year')[measure].max()
+    lower_bound_above = df_above.groupby('Year')[measure].min()
+    plt.fill_between(years, lower_bound_above, upper_bound_above, color='blue', alpha=0.3, label='> threshold')
+    
+    upper_bound_below = df_below.groupby('Year')[measure].max()
+    lower_bound_below = df_below.groupby('Year')[measure].min()
+    plt.fill_between(years, lower_bound_below, upper_bound_below, color='green', alpha=0.3, label='< threshold')
+    
+    plt.title(f'{measure} vs Year for {variable} with threshold {threshold}')
+    plt.xlabel('Year')
+    plt.ylabel(measure)
+    plt.legend()
+    plt.show()
+    
+    # Plot the width of uncertainty band
+    plt.figure(figsize=(12, 6))
+    
+    uncertainty_band_above = upper_bound_above - lower_bound_above
+    uncertainty_band_below = upper_bound_below - lower_bound_below
+    
+    # Normalize the width
+    max_width = max(uncertainty_band_above.max(), uncertainty_band_below.max())
+    normalized_width_above = uncertainty_band_above / max_width
+    normalized_width_below = uncertainty_band_below / max_width
+    
+    plt.plot(years, normalized_width_above, label='> threshold', color='blue')
+    plt.plot(years, normalized_width_below, label='< threshold', color='green')
+    
+    plt.title(f'Width of Uncertainty Band for {measure} over Years')
+    plt.xlabel('Year')
+    plt.ylabel('Normalized Width (0 to 1)')
+    plt.legend()
+    plt.show()
+
+# Define thresholds for each variable and plot
+thresholds = {
+    "hydrogen_availability_ldv": 50,
+    "charging_availability_public": 50,
+    "household_icev_ban": 2035,
+    "vehicle_cost_bev_ldv": 30000,  # example threshold
+    "vehicle_cost_phev_ldv": 25000  # example threshold
+}
+
+measures = ["EVs_per_Household", "Energy_per_Household", "VMT_per_EV"]
+
+for variable, threshold in thresholds.items():
+    for measure in measures:
+        plot_uncertainty_band(merged_df, variable, threshold, measure)
