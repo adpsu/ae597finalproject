@@ -1,1 +1,61 @@
-*wink*
+import geopandas as gpd
+import geopandas as gpd
+import pandas as pd
+import matplotlib.pyplot as plt
+# Replace 'path_to_file' with the path to the file you downloaded
+tmas_class = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Class.gdb')
+tmas_stations = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Stations_Table.gdb')
+tmas_volume = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Volume.gdb')
+# Get basic info about the GeoDataFrame
+print(tmas_stations.info())
+# Load the GeoJSON data into a GeoDataFrame
+counties_gdf = gpd.read_file("/Users/adwaydas/epa_task7/NTAD_Counties.geojson")
+
+# Convert the latitude and longitude columns to numeric (float) types
+tmas_stations['latitude'] = pd.to_numeric(tmas_stations['latitude'], errors='coerce')
+tmas_stations['longitude'] = pd.to_numeric(tmas_stations['longitude'], errors='coerce')
+
+# Correct the signs for latitude and longitude
+# Latitude should remain positive, longitude should be negative
+tmas_stations['latitude'] = tmas_stations['latitude'] / 1e6
+tmas_stations['longitude'] = -abs(tmas_stations['longitude'] / 1e6)
+
+# Create a GeoDataFrame for the points in tmas_stations
+points_gdf = gpd.GeoDataFrame(
+    tmas_stations, geometry=gpd.points_from_xy(tmas_stations.longitude, tmas_stations.latitude), crs="EPSG:4326"
+)
+
+# Plot the counties and the points
+fig, ax = plt.subplots(figsize=(50, 10))
+counties_gdf.plot(ax=ax, color="lightgray", edgecolor="black")
+points_gdf.plot(ax=ax, color="red", marker="o", markersize=5)
+
+plt.title("County Boundaries with TMAS Stations")
+plt.show()
+
+
+
+# Replace 'ports.geojson' with the actual path to your GeoJSON file
+ports_gdf = gpd.read_file('/Users/adwaydas/epa_task7/Principal_Ports.geojson')
+
+# Check the current CRS of the ports and transform to a metric CRS
+ports_gdf = ports_gdf.to_crs(epsg=3857)  # EPSG:3857 is a global CRS in meters
+
+# Buffer by 350 km (350,000 meters)
+ports_buffer = ports_gdf.buffer(350000)
+
+# Project the counties to the same CRS as the buffered ports
+counties_gdf = counties_gdf.to_crs(ports_gdf.crs)
+
+# Perform a spatial join to find counties that intersect with or are within the buffer zones
+counties_within_radius = counties_gdf[counties_gdf.intersects(ports_buffer.union_all()) | counties_gdf.within(ports_buffer.union_all())]
+
+# Plot the counties within 350 km of the ports
+fig, ax = plt.subplots(figsize=(10, 50))
+counties_gdf.plot(ax=ax, color="lightgray", edgecolor="black")
+counties_within_radius.plot(ax=ax, color="blue", edgecolor="black")
+ports_gdf.plot(ax=ax, color="red", marker="o", markersize=5)
+ports_buffer.boundary.plot(ax=ax, color="orange", linestyle="--")
+
+plt.title("Counties within 350 km of Ports")
+plt.show()
