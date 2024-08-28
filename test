@@ -1,61 +1,62 @@
-import geopandas as gpd
-import geopandas as gpd
+# Adjusting the code to ensure truck numbers are in round numbers
 import pandas as pd
-import matplotlib.pyplot as plt
-# Replace 'path_to_file' with the path to the file you downloaded
-tmas_class = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Class.gdb')
-tmas_stations = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Stations_Table.gdb')
-tmas_volume = gpd.read_file('/Users/adwaydas/epa_task7/TMAS_2023_Volume.gdb')
-# Get basic info about the GeoDataFrame
-print(tmas_stations.info())
-# Load the GeoJSON data into a GeoDataFrame
-counties_gdf = gpd.read_file("/Users/adwaydas/epa_task7/NTAD_Counties.geojson")
+import numpy as np
+import os
 
-# Convert the latitude and longitude columns to numeric (float) types
-tmas_stations['latitude'] = pd.to_numeric(tmas_stations['latitude'], errors='coerce')
-tmas_stations['longitude'] = pd.to_numeric(tmas_stations['longitude'], errors='coerce')
+# Sample port_df
+port_df = pd.DataFrame({
+    'port_number': [10, 20],
+    'weekly_truck_visit': [600, 800]
+})
 
-# Correct the signs for latitude and longitude
-# Latitude should remain positive, longitude should be negative
-tmas_stations['latitude'] = tmas_stations['latitude'] / 1e6
-tmas_stations['longitude'] = -abs(tmas_stations['longitude'] / 1e6)
+# Sample itinerary data for 6 days (similar to the sample data we created)
+# Assuming it's the same as the sample data
+drayage_itinerary_files = [sample_df for _ in range(6)]  # Representing 6 days
 
-# Create a GeoDataFrame for the points in tmas_stations
-points_gdf = gpd.GeoDataFrame(
-    tmas_stations, geometry=gpd.points_from_xy(tmas_stations.longitude, tmas_stations.latitude), crs="EPSG:4326"
-)
+# Step 1: Calculate Daily Truck Ratios
+daily_truck_counts = [df.shape[0] for df in drayage_itinerary_files]
+total_truck_count = sum(daily_truck_counts)
+daily_ratios = [count / total_truck_count for count in daily_truck_counts]
 
-# Plot the counties and the points
-fig, ax = plt.subplots(figsize=(50, 10))
-counties_gdf.plot(ax=ax, color="lightgray", edgecolor="black")
-points_gdf.plot(ax=ax, color="red", marker="o", markersize=5)
+# Step 2: Distribute Weekly Truck Visits with Normal Distributed Error
+distributed_truck_visits = port_df.copy()
+for idx, row in distributed_truck_visits.iterrows():
+    visits_per_day = [int(row['weekly_truck_visit'] * ratio) for ratio in daily_ratios]
+    # Add normal distributed error with mean=0 and std=25
+    visits_per_day = [max(0, int(visit + np.random.normal(0, 25))) for visit in visits_per_day]
+    distributed_truck_visits.at[idx, 'visits_per_day'] = visits_per_day
 
-plt.title("County Boundaries with TMAS Stations")
-plt.show()
+# Step 3: Resample Truck Itineraries with Round Truck Numbers
+def resample_itineraries(itinerary_df, total_visits):
+    sampled_data = []
+    while len(sampled_data) < total_visits:
+        truck_to_sample = itinerary_df['truck_no'].sample().iloc[0]
+        truck_data = itinerary_df[itinerary_df['truck_no'] == truck_to_sample]
+        sampled_data.append(truck_data)
+    sampled_df = pd.concat(sampled_data).head(total_visits)
+    sampled_df['truck_no'] = sampled_df['truck_no'].str.extract('(\d+)').astype(int)
+    return sampled_df
 
+# Step 4: Save Data in Structured Folders
+output_folder = 'output'
+os.makedirs(output_folder, exist_ok=True)
 
+for idx, row in distributed_truck_visits.iterrows():
+    port_number = row['port_number']
+    visits_per_day = row['visits_per_day']
+    
+    port_folder = os.path.join(output_folder, f'port_{port_number}')
+    os.makedirs(port_folder, exist_ok=True)
+    
+    for i, day_visits in enumerate(visits_per_day):
+        sampled_df = resample_itineraries(drayage_itinerary_files[i], day_visits)
+        
+        output_file = os.path.join(port_folder, f'port_{port_number}_drayage_itenary_day_{i+1}.csv')
+        sampled_df.to_csv(output_file, index=False, columns=[
+            'truck_no', 'vet_type', 'origin_type', 'start_time_sec', 
+            'end_time_sec', 'destination_type', 'trip_distance_mi',
+            'trip_duration_sec', 'stop_duration_sec'
+        ])
 
-# Replace 'ports.geojson' with the actual path to your GeoJSON file
-ports_gdf = gpd.read_file('/Users/adwaydas/epa_task7/Principal_Ports.geojson')
+print("Sampling with error term and saving completed successfully.")
 
-# Check the current CRS of the ports and transform to a metric CRS
-ports_gdf = ports_gdf.to_crs(epsg=3857)  # EPSG:3857 is a global CRS in meters
-
-# Buffer by 350 km (350,000 meters)
-ports_buffer = ports_gdf.buffer(350000)
-
-# Project the counties to the same CRS as the buffered ports
-counties_gdf = counties_gdf.to_crs(ports_gdf.crs)
-
-# Perform a spatial join to find counties that intersect with or are within the buffer zones
-counties_within_radius = counties_gdf[counties_gdf.intersects(ports_buffer.union_all()) | counties_gdf.within(ports_buffer.union_all())]
-
-# Plot the counties within 350 km of the ports
-fig, ax = plt.subplots(figsize=(10, 50))
-counties_gdf.plot(ax=ax, color="lightgray", edgecolor="black")
-counties_within_radius.plot(ax=ax, color="blue", edgecolor="black")
-ports_gdf.plot(ax=ax, color="red", marker="o", markersize=5)
-ports_buffer.boundary.plot(ax=ax, color="orange", linestyle="--")
-
-plt.title("Counties within 350 km of Ports")
-plt.show()
