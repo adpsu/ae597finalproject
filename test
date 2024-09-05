@@ -1,1 +1,56 @@
-TADDDAAAA
+import requests
+import json
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+
+# List of ArcGIS REST API endpoints (replace with actual service URLs)
+rest_api_urls = [
+    "https://gis.cenhud.com/arcgis/rest/services/.../MapServer",  # Example
+    "https://coned.maps.arcgis.com/arcgis/rest/services/.../MapServer",
+    "https://www.arcgis.com/arcgis/rest/services/.../MapServer"
+]
+
+# Function to get the data from ArcGIS REST API
+def get_map_data(rest_api_url):
+    query_url = f"{rest_api_url}/0/query"  # Layer index (e.g., 0) might change based on the service
+    params = {
+        "where": "1=1",  # Query all features
+        "outFields": "*",  # Get all fields
+        "f": "json"  # Return data in JSON format
+    }
+    response = requests.get(query_url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to get data from {rest_api_url}")
+        return None
+
+# Retrieve data from all the REST API endpoints
+all_data = []
+for url in rest_api_urls:
+    data = get_map_data(url)
+    if data:
+        all_data.append(data)
+
+# Combine and process data (depends on structure of JSON)
+# For example, combining feature coordinates
+combined_features = []
+for data in all_data:
+    if 'features' in data:
+        combined_features.extend(data['features'])
+
+# Simple visualization of the combined data (optional)
+# Example: If each feature has spatial coordinates (use Basemap or similar)
+plt.figure(figsize=(10, 8))
+m = Basemap(projection='merc', llcrnrlat=40, urcrnrlat=45, llcrnrlon=-75, urcrnrlon=-70)
+m.drawcoastlines()
+
+# Plot features (assumes geographic coordinates)
+for feature in combined_features:
+    geometry = feature['geometry']
+    if 'x' in geometry and 'y' in geometry:
+        x, y = m(geometry['x'], geometry['y'])
+        plt.plot(x, y, 'bo')  # Plot the point on the map
+
+plt.title('Combined Map Data from Multiple Sources')
+plt.show()
