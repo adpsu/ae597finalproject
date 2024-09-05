@@ -54,3 +54,72 @@ for feature in combined_features:
 
 plt.title('Combined Map Data from Multiple Sources')
 plt.show()
+
+
+
+
+
+import requests
+import json
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+
+# List of ArcGIS REST API endpoints (replace with actual service URLs)
+rest_api_urls = [
+    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/IEDR_CECONY/FeatureServer",
+    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_Disadvantaged_Communities_Prod/FeatureServer",
+    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_EVM_Feeders_Prod/FeatureServer"
+]
+
+# Function to get the data from ArcGIS REST API
+def get_map_data(rest_api_url):
+    query_url = f"{rest_api_url}/0/query"  # Layer index (e.g., 0) might change based on the service
+    params = {
+        "where": "1=1",  # Query all features
+        "outFields": "*",  # Get all fields
+        "f": "json"  # Return data in JSON format
+    }
+    response = requests.get(query_url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to get data from {rest_api_url}")
+        return None
+
+# Retrieve data from all the REST API endpoints
+all_data = []
+for url in rest_api_urls:
+    data = get_map_data(url)
+    if data:
+        all_data.append(data)
+
+# Combine and process data (depends on structure of JSON)
+# For example, combining feature coordinates
+combined_features = []
+for data in all_data:
+    if 'features' in data:
+        combined_features.extend(data['features'])
+
+# Create a figure and set up the map projection using Cartopy
+plt.figure(figsize=(10, 8))
+ax = plt.axes(projection=ccrs.Mercator())  # Mercator projection
+ax.set_extent([-75, -70, 40, 45], crs=ccrs.PlateCarree())  # Extent based on coordinates
+
+# Add coastlines and other map features
+ax.add_feature(cfeature.COASTLINE)
+ax.add_feature(cfeature.BORDERS, linestyle=':')
+ax.add_feature(cfeature.LAND, edgecolor='black')
+ax.add_feature(cfeature.OCEAN)
+
+# Plot features (assumes geographic coordinates)
+for feature in combined_features:
+    geometry = feature['geometry']
+    if 'x' in geometry and 'y' in geometry:
+        x, y = geometry['x'], geometry['y']
+        ax.plot(x, y, 'bo', transform=ccrs.PlateCarree())  # Plot the point on the map
+
+# Add a title and display the map
+plt.title('Combined Map Data from Multiple Sources')
+plt.show()
+
