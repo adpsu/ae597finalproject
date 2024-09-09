@@ -1,125 +1,115 @@
-import requests
-import json
-import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+import os
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
 
-# List of ArcGIS REST API endpoints (replace with actual service URLs)
-rest_api_urls = [
-    "https://gis.cenhud.com/arcgis/rest/services/.../MapServer",  # Example
-    "https://coned.maps.arcgis.com/arcgis/rest/services/.../MapServer",
-    "https://www.arcgis.com/arcgis/rest/services/.../MapServer"
-]
+def download_airport_data(airport_code, from_date, to_date, download_dir):
+    # Set up the webdriver (ensure the path to your chromedriver is correct)
+    options = webdriver.ChromeOptions()
+    prefs = {"download.default_directory": download_dir}
+    options.add_experimental_option("prefs", prefs)
+    
+    driver = webdriver.Chrome(options=options)
 
-# Function to get the data from ArcGIS REST API
-def get_map_data(rest_api_url):
-    query_url = f"{rest_api_url}/0/query"  # Layer index (e.g., 0) might change based on the service
-    params = {
-        "where": "1=1",  # Query all features
-        "outFields": "*",  # Get all fields
-        "f": "json"  # Return data in JSON format
-    }
-    response = requests.get(query_url, params=params)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to get data from {rest_api_url}")
-        return None
+    try:
+        # Navigate to the main page
+        url = "https://aspm.faa.gov/apm/sys/main.asp"
+        driver.get(url)
 
-# Retrieve data from all the REST API endpoints
-all_data = []
-for url in rest_api_urls:
-    data = get_map_data(url)
-    if data:
-        all_data.append(data)
+        # Wait for the page to load
+        time.sleep(2)
 
-# Combine and process data (depends on structure of JSON)
-# For example, combining feature coordinates
-combined_features = []
-for data in all_data:
-    if 'features' in data:
-        combined_features.extend(data['features'])
+        # Click the "Airport Analysis" tab
+        airport_analysis_tab = driver.find_element(By.LINK_TEXT, "Aviation System Performance Metrics (ASPM)")
+        airport_analysis_tab.click()
 
-# Simple visualization of the combined data (optional)
-# Example: If each feature has spatial coordinates (use Basemap or similar)
-plt.figure(figsize=(10, 8))
-m = Basemap(projection='merc', llcrnrlat=40, urcrnrlat=45, llcrnrlon=-75, urcrnrlon=-70)
-m.drawcoastlines()
+        # Switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[1])
 
-# Plot features (assumes geographic coordinates)
-for feature in combined_features:
-    geometry = feature['geometry']
-    if 'x' in geometry and 'y' in geometry:
-        x, y = m(geometry['x'], geometry['y'])
-        plt.plot(x, y, 'bo')  # Plot the point on the map
+        # Select "Analysis: All Flights" for display
+        analysis_all_flights = driver.find_element(By.CSS_SELECTOR, "input[name='reptype'][value='r1']")
+        analysis_all_flights.click()
 
-plt.title('Combined Map Data from Multiple Sources')
-plt.show()
+        # Select "MS Excel" as the format
+        ms_excel_format = driver.find_element(By.CSS_SELECTOR, "input[name='reportformat'][value='msexcel']")
+        ms_excel_format.click()
 
+        # Ensure "No Sub-Totals" checkbox is checked
+        no_sub_totals_checkbox = driver.find_element(By.CSS_SELECTOR, "input[name='nosubtot'][value='1']")
+        if not no_sub_totals_checkbox.is_selected():
+            no_sub_totals_checkbox.click()
 
+        # Select the date range
+        from_month, from_day, from_year = from_date.split('-')
+        to_month, to_day, to_year = to_date.split('-')
 
+        from_month_select = Select(driver.find_element(By.NAME, "fm_r"))
+        from_month_select.select_by_value(from_month)
 
+        from_day_select = Select(driver.find_element(By.NAME, "fd_r"))
+        from_day_select.select_by_value(from_day)
 
-import requests
-import json
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
+        from_year_select = Select(driver.find_element(By.NAME, "fy_r"))
+        from_year_select.select_by_value(from_year)
 
-# List of ArcGIS REST API endpoints (replace with actual service URLs)
-rest_api_urls = [
-    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/IEDR_CECONY/FeatureServer",
-    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_Disadvantaged_Communities_Prod/FeatureServer",
-    "https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_EVM_Feeders_Prod/FeatureServer"
-]
+        to_month_select = Select(driver.find_element(By.NAME, "tm_r"))
+        to_month_select.select_by_value(to_month)
 
-# Function to get the data from ArcGIS REST API
-def get_map_data(rest_api_url):
-    query_url = f"{rest_api_url}/0/query"  # Layer index (e.g., 0) might change based on the service
-    params = {
-        "where": "1=1",  # Query all features
-        "outFields": "*",  # Get all fields
-        "f": "json"  # Return data in JSON format
-    }
-    response = requests.get(query_url, params=params)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to get data from {rest_api_url}")
-        return None
+        to_day_select = Select(driver.find_element(By.NAME, "td_r"))
+        to_day_select.select_by_value(to_day)
 
-# Retrieve data from all the REST API endpoints
-all_data = []
-for url in rest_api_urls:
-    data = get_map_data(url)
-    if data:
-        all_data.append(data)
+        to_year_select = Select(driver.find_element(By.NAME, "ty_r"))
+        to_year_select.select_by_value(to_year)
 
-# Combine and process data (depends on structure of JSON)
-# For example, combining feature coordinates
-combined_features = []
-for data in all_data:
-    if 'features' in data:
-        combined_features.extend(data['features'])
+        # Enter the airport code
+        airport_code_input = driver.find_element(By.ID, "locQuick")
+        airport_code_input.clear()
+        airport_code_input.send_keys(airport_code)
 
-# Create a figure and set up the map projection using Cartopy
-plt.figure(figsize=(10, 8))
-ax = plt.axes(projection=ccrs.Mercator())  # Mercator projection
-ax.set_extent([-75, -70, 40, 45], crs=ccrs.PlateCarree())  # Extent based on coordinates
+        # Click the "Go" button
+        go_button = driver.find_element(By.XPATH, "//input[@type='button' and @value='Go']")
+        go_button.click()
 
-# Add coastlines and other map features
-ax.add_feature(cfeature.COASTLINE)
-ax.add_feature(cfeature.BORDERS, linestyle=':')
-ax.add_feature(cfeature.LAND, edgecolor='black')
-ax.add_feature(cfeature.OCEAN)
+        # In the "Grouping" tab, select all fields using `addFld`, `addHR`, and `addGMTHR`
+        all_links = driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addFld')]") + \
+                    driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addHR')]") + \
+                    driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addGMTHR')]")
 
-# Plot features (assumes geographic coordinates)
-for feature in combined_features:
-    geometry = feature['geometry']
-    if 'x' in geometry and 'y' in geometry:
-        x, y = geometry['x'], geometry['y']
-        ax.plot(x, y, 'bo', transform=ccrs.PlateCarree())  # Plot the point on the map
+        for link in all_links:
+            link.click()
+            time.sleep(1)
 
-# Add a title and display the map
-plt.title('Combined Map Data from Multiple Sources')
-plt.show()
+        # Click the "Run" button to generate the report
+        run_button = driver.find_element(By.LINK_TEXT, "Run")
+        run_button.click()
 
+        # Wait for download to start
+        time.sleep(10)
+
+        # Wait for the download to finish by checking the directory for the file
+        download_wait(download_dir)
+
+    finally:
+        # Close the browser when done
+        driver.quit()
+
+def download_wait(directory, timeout=30):
+    """
+    Waits for all downloads in the specified directory to complete.
+    """
+    seconds = 0
+    while seconds < timeout:
+        if not any([filename.endswith(".crdownload") for filename in os.listdir(directory)]):
+            return True
+        time.sleep(1)
+        seconds += 1
+    return False
+
+# Example usage:
+download_dir = "/path/to/your/download/directory"  # Change to your download folder
+download_airport_data("JFK", "01-01-2023", "12-31-2023", download_dir)
