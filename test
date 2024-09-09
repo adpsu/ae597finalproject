@@ -22,16 +22,37 @@ def download_airport_data(airport_code, from_date, to_date, download_dir):
         # Wait for the page to load
         time.sleep(2)
 
-        # Click the "Airport Analysis" tab
+        # Click the "Aviation System Performance Metrics (ASPM)" tab
         airport_analysis_tab = driver.find_element(By.LINK_TEXT, "Aviation System Performance Metrics (ASPM)")
         airport_analysis_tab.click()
 
-        # Switch to the new window
+        # Wait and switch to the new window
         time.sleep(2)
         window_handles = driver.window_handles
-        driver.switch_to.window(window_handles[1])
+        driver.switch_to.window(window_handles[0])
 
-        # Select "Analysis: All Flights" for display
+        # Click the "Airport Analysis" tab
+        airport_analysis_tab = driver.find_element(By.LINK_TEXT, "Airport Analysis")
+        airport_analysis_tab.click()
+        
+        # Wait and switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
+        
+        # Click the "Output" tab
+        airport_analysis_tab = driver.find_element(By.LINK_TEXT, "Output")
+        airport_analysis_tab.click()
+        
+        # Wait and switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
+
+        # Wait for the page to load
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Select "Analysis: All Flights"
         analysis_all_flights = driver.find_element(By.CSS_SELECTOR, "input[name='reptype'][value='r1']")
         analysis_all_flights.click()
 
@@ -44,29 +65,43 @@ def download_airport_data(airport_code, from_date, to_date, download_dir):
         if not no_sub_totals_checkbox.is_selected():
             no_sub_totals_checkbox.click()
 
-        # Select the date range
+        # Click the "Dates" tab
+        dates_tab = driver.find_element(By.LINK_TEXT, "Dates")
+        dates_tab.click()
+        
+        # Wait and switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
+
+        # Select "Date Ranges" and set the date range
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='dtype'][value='r']")))
+        date_range = driver.find_element(By.CSS_SELECTOR, "input[name='dtype'][value='r']")
+        date_range.click()
+
+        # Set the "From" date
         from_month, from_day, from_year = from_date.split('-')
         to_month, to_day, to_year = to_date.split('-')
 
-        from_month_select = Select(driver.find_element(By.NAME, "fm_r"))
-        from_month_select.select_by_value(from_month)
+        Select(driver.find_element(By.NAME, "fm_r")).select_by_value(from_month)
+        Select(driver.find_element(By.NAME, "fd_r")).select_by_value(from_day)
+        Select(driver.find_element(By.NAME, "fy_r")).select_by_value(from_year)
 
-        from_day_select = Select(driver.find_element(By.NAME, "fd_r"))
-        from_day_select.select_by_value(from_day)
+        # Set the "To" date
+        Select(driver.find_element(By.NAME, "tm_r")).select_by_value(to_month)
+        Select(driver.find_element(By.NAME, "td_r")).select_by_value(to_day)
+        Select(driver.find_element(By.NAME, "ty_r")).select_by_value(to_year)
 
-        from_year_select = Select(driver.find_element(By.NAME, "fy_r"))
-        from_year_select.select_by_value(from_year)
+        # Click the "Airports" tab
+        airports_tab = driver.find_element(By.LINK_TEXT, "Airports")
+        airports_tab.click()
+        
+        # Wait and switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
 
-        to_month_select = Select(driver.find_element(By.NAME, "tm_r"))
-        to_month_select.select_by_value(to_month)
-
-        to_day_select = Select(driver.find_element(By.NAME, "td_r"))
-        to_day_select.select_by_value(to_day)
-
-        to_year_select = Select(driver.find_element(By.NAME, "ty_r"))
-        to_year_select.select_by_value(to_year)
-
-        # Enter the airport code
+        # Enter Airport code, for example "JFK" into the airport code field
         airport_code_input = driver.find_element(By.ID, "locQuick")
         airport_code_input.clear()
         airport_code_input.send_keys(airport_code)
@@ -75,32 +110,43 @@ def download_airport_data(airport_code, from_date, to_date, download_dir):
         go_button = driver.find_element(By.XPATH, "//input[@type='button' and @value='Go']")
         go_button.click()
 
-        # In the "Grouping" tab, select all fields using `addFld`, `addHR`, and `addGMTHR`
+        # Click the "Grouping" tab
+        grouping_tab = driver.find_element(By.LINK_TEXT, "Grouping")
+        grouping_tab.click()
+        
+        # Wait and switch to the new window
+        time.sleep(2)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
+
+        # Select all fields using `addFld`, `addHR`, and `addGMTHR`
         all_links = driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addFld')]") + \
                     driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addHR')]") + \
                     driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript:addGMTHR')]")
 
         for link in all_links:
             link.click()
-            time.sleep(1)
+            time.sleep(1)  # Optional: Delay for each click
 
-        # Click the "Run" button to generate the report
-        run_button = driver.find_element(By.LINK_TEXT, "Run")
-        run_button.click()
+        # Click the "Run" button
+        run_tab = driver.find_element(By.LINK_TEXT, "Run")
+        run_tab.click()
 
-        # Wait for download to start
+        # Wait and switch to the new window
         time.sleep(10)
+        window_handles = driver.window_handles
+        driver.switch_to.window(window_handles[0])
 
-        # Wait for the download to finish by checking the directory for the file
+        # Wait for the download to finish
         download_wait(download_dir)
 
     finally:
         # Close the browser when done
         driver.quit()
 
-def download_wait(directory, timeout=30):
+def download_wait(directory, timeout=600):
     """
-    Waits for all downloads in the specified directory to complete.
+    Wait for the downloads to complete within a specified directory.
     """
     seconds = 0
     while seconds < timeout:
@@ -110,6 +156,7 @@ def download_wait(directory, timeout=30):
         seconds += 1
     return False
 
+
 # Example usage:
-download_dir = "/path/to/your/download/directory"  # Change to your download folder
-download_airport_data("JFK", "01-01-2023", "12-31-2023", download_dir)
+download_dir = ""  # Change to your download folder
+download_airport_data("IAD", "01-01-2023", "12-31-2023", download_dir)
