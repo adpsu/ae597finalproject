@@ -1,1 +1,179 @@
-wappah <>_<>
+import geopandas as gpd
+import requests
+import matplotlib.pyplot as plt
+
+# Helper function to fetch data from ArcGIS REST API
+def fetch_arcgis_layer_data(url, layer):
+    """
+    Function to fetch data from a given ArcGIS REST API layer and convert it to a GeoDataFrame.
+    Args:
+    url (str): The URL of the ArcGIS REST API.
+    layer (int): The layer number to fetch.
+
+    Returns:
+    GeoDataFrame: A geopandas GeoDataFrame containing the requested layer data or an empty GeoDataFrame if there's an error.
+    """
+    query_url = f"{url}/{layer}/query"
+    params = {
+        'where': '1=1',
+        'outFields': '*',
+        'f': 'geojson'
+    }
+    try:
+        response = requests.get(query_url, params=params)
+        if response.status_code == 200:
+            try:
+                return gpd.GeoDataFrame.from_features(response.json()['features'])
+            except (KeyError, ValueError):
+                print(f"Could not parse the response for {url}, Layer {layer}")
+        else:
+            print(f"Failed to fetch data for {url} Layer {layer}. Status Code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed for {url} Layer {layer}: {e}")
+    return gpd.GeoDataFrame()
+
+# Load New York counties shapefile
+ny_counties_file = './NYS_boundary.geojson'
+ny_counties = gpd.read_file(ny_counties_file)
+
+# Utility REST API endpoints and layers
+rest_api_layers = {
+    'Central Hudson Electrification': {
+        'url': 'https://gis.cenhud.com/gisserver/rest/services/Public/Electrification_Hosting_Capacity/MapServer',
+        'layers': [
+            (0, "Summer 3 Phase OH/UG"),
+            (1, "Winter 3 Phase OH/UG"),
+            (2, "1 & 2 Phase Lines")
+        ]
+    },
+    'Con Edison EVM Feeder': {
+        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/CECONY_EVM_Feeders_Prod/FeatureServer',
+        'layers': [
+            (0, "Summer Load Capacity for 3PH Feeders"),
+            (1, "Winter Load Capacity for 3PH Feeders"),
+            (2, "No Load Capacity for 1PH and 2PH Feeders"),
+            (3, "Substation Level System Data")
+        ]
+    },
+    'Con Edison EV Transformers': {
+        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/CECONY_EVM_Prod/FeatureServer',
+        'layers': [
+            (0, "460v Transformers"),
+            (1, "208v Transformers")
+        ]
+    },
+    'Orange & Rockland EVM Feeder': {
+        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_EVM_Feeders_Prod/FeatureServer',
+        'layers': [
+            (0, "Summer Load Capacity for 3PH Feeders"),
+            (1, "Winter Load Capacity for 3PH Feeders"),
+            (2, "No Load Capacity for 1PH and 2PH Feeders")
+        ]
+    },
+    'National Grid EV Load Capacity': {
+        'url': 'https://systemdataportal.nationalgrid.com/arcgis/rest/services/NYSDP/EV_Load_Serving_Capacity/MapServer',
+        'layers': [
+            (0, "Feeder Level Data 3 Phase"),
+            (1, "1 and 2 Phase")
+        ]
+    }
+}
+
+# Fetch data from each layer and store in a list of GeoDataFrames
+layer_data = []
+for utility, info in rest_api_layers.items():
+    for layer, description in info['layers']:
+        gdf = fetch_arcgis_layer_data(info['url'], layer)
+        if not gdf.empty:
+            layer_data.append((utility, layer, description, gdf))
+
+# Plotting
+fig, ax = plt.subplots(figsize=(14, 14))
+
+# Improve the background color for NY counties
+ny_counties.plot(ax=ax, color='#F5F5F5', edgecolor='#AAAAAA', linewidth=0.5, label='NY Counties')  # Lighter background and subtle borders
+
+# Improved color palette for better distinction
+colors = ['#FF5733', '#33C1FF', '#77DD77', '#D4A017', '#9370DB', '#FFD700', '#FF69B4', '#40E0D0', '#8B4513', '#F08080']
+
+# Plot each layer with unique color and small dot size for easy identification
+for idx, (utility, layer, description, gdf) in enumerate(layer_data):
+    if not gdf.empty:
+        gdf.plot(
+            ax=ax, 
+            color=colors[idx % len(colors)], 
+            markersize=5,  # Smaller markers for better clarity
+            label=f'{utility} - {description}'
+        )
+        print(f'Plotted: {utility} - Layer {layer}: {description}')
+
+# Customize plot
+plt.title("New York Utility Hosting Capacity and EV Charging Data", fontsize=16)
+plt.xlabel("Longitude", fontsize=12)
+plt.ylabel("Latitude", fontsize=12)
+
+# Move legend outside the plot
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=10)
+
+# Display the plot
+plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to fit the legend outside the figure
+plt.show()
+
+
+
+
+
+-----------------
+-----------------
+
+
+# List of specific counties to filter
+target_counties = ['Richmond', 'Kings', 'Queens', 'New York','Bronx', 'Westchester', 'Rockland']  # Assuming "Dockland" meant "Rockland"
+
+# Filter the `ny_counties` GeoDataFrame for only the specified counties
+filtered_counties = ny_counties[ny_counties['NAME'].isin(target_counties)]
+
+# Ensure filtered_counties is in EPSG:4326
+if filtered_counties.crs != 'EPSG:4326':
+    filtered_counties = filtered_counties.to_crs('EPSG:4326')
+
+# Create a new figure and axis for this plot
+fig, ax = plt.subplots(figsize=(10, 10))
+
+# Plot only the selected counties as the background
+filtered_counties.plot(ax=ax, color='#F5F5F5', edgecolor='#333333', linewidth=0.8, label='Selected Counties')
+
+# Improved color palette for better distinction
+colors = ['#FF5733', '#33C1FF', '#77DD77', '#D4A017', '#9370DB', '#FFD700', '#FF69B4', '#40E0D0', '#8B4513', '#F08080']
+
+# Plot only the utility data that falls within the selected counties
+for idx, (utility, layer, description, gdf) in enumerate(layer_data):
+    # Check and ensure the utility data has a CRS and reproject if necessary
+    if gdf.crs is None:
+        gdf = gdf.set_crs('EPSG:4326')  # Assign EPSG:4326 if the CRS is missing
+    elif gdf.crs != 'EPSG:4326':
+        gdf = gdf.to_crs('EPSG:4326')  # Reproject to EPSG:4326 if necessary
+    
+    # Clip the GeoDataFrame to the selected counties
+    clipped_gdf = gpd.clip(gdf, filtered_counties)
+    
+    if not clipped_gdf.empty:
+        clipped_gdf.plot(
+            ax=ax,
+            color=colors[idx % len(colors)], 
+            markersize=5,  # Smaller markers for better clarity
+            label=f'{utility} - {description}'
+        )
+        print(f'Plotted (filtered): {utility} - Layer {layer}: {description}')
+
+# Customize plot
+plt.title("Utility Data in Selected NYC and Surrounding Counties", fontsize=14)
+plt.xlabel("Longitude", fontsize=12)
+plt.ylabel("Latitude", fontsize=12)
+
+# Move legend outside the plot
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=10)
+
+# Display the plot
+plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to fit the legend outside the figure
+plt.show()
