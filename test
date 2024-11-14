@@ -1,350 +1,95 @@
-import geopandas as gpd
-import requests
 import matplotlib.pyplot as plt
-
-# Helper function to fetch data from ArcGIS REST API
-def fetch_arcgis_layer_data(url, layer):
-    """
-    Function to fetch data from a given ArcGIS REST API layer and convert it to a GeoDataFrame.
-    Args:
-    url (str): The URL of the ArcGIS REST API.
-    layer (int): The layer number to fetch.
-
-    Returns:
-    GeoDataFrame: A geopandas GeoDataFrame containing the requested layer data or an empty GeoDataFrame if there's an error.
-    """
-    query_url = f"{url}/{layer}/query"
-    params = {
-        'where': '1=1',
-        'outFields': '*',
-        'f': 'geojson'
-    }
-    try:
-        response = requests.get(query_url, params=params)
-        if response.status_code == 200:
-            try:
-                return gpd.GeoDataFrame.from_features(response.json()['features'])
-            except (KeyError, ValueError):
-                print(f"Could not parse the response for {url}, Layer {layer}")
-        else:
-            print(f"Failed to fetch data for {url} Layer {layer}. Status Code: {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        print(f"Request failed for {url} Layer {layer}: {e}")
-    return gpd.GeoDataFrame()
-
-# Utility REST API endpoints and layers
-rest_api_layers = {
-    'Central Hudson Electrification': {
-        'url': 'https://gis.cenhud.com/gisserver/rest/services/Public/Electrification_Hosting_Capacity/MapServer',
-        'layers': [
-            (0, "Summer 3 Phase OH/UG"),
-            (1, "Winter 3 Phase OH/UG"),
-            (2, "1 & 2 Phase Lines")
-        ]
-    },
-    'Con Edison EVM Feeder': {
-        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/CECONY_EVM_Feeders_Prod/FeatureServer',
-        'layers': [
-            (0, "Summer Load Capacity for 3PH Feeders"),
-            (1, "Winter Load Capacity for 3PH Feeders"),
-            (2, "No Load Capacity for 1PH and 2PH Feeders"),
-            (3, "Substation Level System Data")
-        ]
-    },
-    'Con Edison EV Transformers': {
-        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/CECONY_EVM_Prod/FeatureServer',
-        'layers': [
-            (0, "460v Transformers"),
-            (1, "208v Transformers")
-        ]
-    },
-    'Orange & Rockland EVM Feeder': {
-        'url': 'https://services.arcgis.com/ciPnsNFi1JLWVjva/ArcGIS/rest/services/ORU_EVM_Feeders_Prod/FeatureServer',
-        'layers': [
-            (0, "Summer Load Capacity for 3PH Feeders"),
-            (1, "Winter Load Capacity for 3PH Feeders"),
-            (2, "No Load Capacity for 1PH and 2PH Feeders")
-        ]
-    },
-    'National Grid EV Load Capacity': {
-        'url': 'https://systemdataportal.nationalgrid.com/arcgis/rest/services/NYSDP/EV_Load_Serving_Capacity/MapServer',
-        'layers': [
-            (0, "Feeder Level Data 3 Phase"),
-            (1, "1 and 2 Phase Lines")
-        ]
-    }
-}
-
-# Fetch data from each layer and store in a list of GeoDataFrames
-layer_data = []
-for utility, info in rest_api_layers.items():
-    for layer, description in info['layers']:
-        gdf = fetch_arcgis_layer_data(info['url'], layer)
-        if not gdf.empty:
-            layer_data.append((utility, layer, description, gdf))
-
-
-import geopandas as gpd
-import pandas as pd
-import os
-from shapely import wkt
-import re
-
-# Load the NY Boundaries GeoJSON file with its CRS
-ny_boundaries = gpd.read_file("NY_Boundaries.geojson")
-ny_boundaries_crs = ny_boundaries.crs  # Get CRS from NY Boundaries
-
-# Load the light_box CSV file and convert geometries
-light_box_df = pd.read_csv("light_box_realistic.csv")
-light_box_df['geometry'] = light_box_df['geometry'].apply(wkt.loads)
-light_box_gdf = gpd.GeoDataFrame(light_box_df, geometry='geometry', crs=ny_boundaries_crs)
-
-# Create output directory for county folders
-output_dir = "ny_county_layers"
-os.makedirs(output_dir, exist_ok=True)
-
-# Helper function to clean file names
-def clean_filename(filename):
-    return re.sub(r'[^\w\-_\.]', '_', filename)
-
-# Iterate through each county in the NY boundaries
-for _, county in ny_boundaries.iterrows():
-    county_name = county['NAME']
-    county_code = county['FIPS_CODE']
-    county_geometry = county['geometry']
-
-    # Create directory for each county, named with FIPS code and county name
-    county_dir = os.path.join(output_dir, f"{county_code}_{clean_filename(county_name)}")
-    os.makedirs(county_dir, exist_ok=True)
-    
-    # Save the county boundary itself
-    county_boundary_gdf = gpd.GeoDataFrame([county], geometry='geometry', crs=ny_boundaries_crs)
-    county_boundary_gdf.to_file(os.path.join(county_dir, f"{county_code}_{clean_filename(county_name)}_boundary.geojson"), driver="GeoJSON")
-
-    # Clip and save each utility layer for the county
-    for utility, layer, description, gdf in layer_data:
-        # Ensure CRS is set for each utility layer
-        gdf = gdf.set_crs(ny_boundaries_crs, allow_override=True)
-        
-        # Clip the data to the county boundary
-        clipped_gdf = gpd.clip(gdf, county_geometry)
-        
-        # Create sanitized file name and ensure directory exists
-        sanitized_description = clean_filename(description)
-        file_path = os.path.join(county_dir, f"{utility}_{sanitized_description}.geojson")
-        
-        # Save the clipped data to the county folder if it contains any data
-        if not clipped_gdf.empty:
-            clipped_gdf.to_file(file_path, driver="GeoJSON")
-
-    # Clip and save the light_box parcels for the county
-    clipped_light_box_gdf = gpd.clip(light_box_gdf, county_geometry)
-    if not clipped_light_box_gdf.empty:
-        clipped_light_box_gdf.to_file(os.path.join(county_dir, f"{county_code}_{clean_filename(county_name)}_light_box.geojson"), driver="GeoJSON")
-
-    print(f"Saved data for {county_name} ({county_code})")
-
-print("All county-specific layers saved successfully.")
-
-
-import geopandas as gpd
-import matplotlib.pyplot as plt
-import os
-
-def plot_county_layers(county_name='all', data_dir="ny_county_layers"):
-    """
-    Plot the layers for a specific county or all counties and return the GeoDataFrames.
-    
-    Args:
-    county_name (str): Name of the county to plot, or 'all' to plot all counties.
-    data_dir (str): Directory where county data is stored.
-    
-    Returns:
-    dict: A dictionary where keys are layer names and values are GeoDataFrames.
-    """
-    layers_data = {}  # Dictionary to store GeoDataFrames by layer name
-    
-    if county_name.lower() == 'all':
-        counties = [os.path.join(data_dir, county) for county in os.listdir(data_dir)]
-    else:
-        # Construct path for a specific county
-        counties = [os.path.join(data_dir, county) for county in os.listdir(data_dir) if county.startswith(county_name)]
-    
-    if not counties:
-        print(f"No data found for county '{county_name}'")
-        return layers_data
-
-    fig, ax = plt.subplots(figsize=(15, 15))
-    
-    # Iterate through each county and its layers
-    for county_path in counties:
-        for layer_file in os.listdir(county_path):
-            layer_path = os.path.join(county_path, layer_file)
-            
-            # Load the layer data
-            layer_gdf = gpd.read_file(layer_path)
-            
-            # Determine a suitable legend label based on file name
-            legend_label = layer_file.replace(".geojson", "").replace("_", " ")
-            
-            # Store the GeoDataFrame in the dictionary with a meaningful key
-            layers_data[legend_label] = layer_gdf
-            
-            # Plot each layer with a unique legend label
-            if 'boundary' in layer_file.lower():
-                layer_gdf.plot(ax=ax, color='none', edgecolor='black', linewidth=1, label=f"{legend_label} Boundary")
-            elif 'light_box' in layer_file.lower():
-                layer_gdf.plot(ax=ax, column='parcel_type', legend=True, alpha=0.5, cmap='viridis', label=legend_label)
-            else:
-                layer_gdf.plot(ax=ax, linewidth=1, label=legend_label)
-    
-    # Add legend, title, and show plot
-    plt.legend(loc="upper right", bbox_to_anchor=(1.15, 1.05))
-    plt.title(f"Plot of County Layers for '{county_name.capitalize()}'" if county_name != 'all' else "Plot of All Counties")
-    plt.show()
-    
-    return layers_data
-
-# Example usage:
-# Plot a specific county and get the GeoDataFrames
-county_layers = plot_county_layers("36119_Westchester")
-
-# Plot all counties and get the GeoDataFrames
-#all_layers = plot_county_layers("all")
-
-
-# Function to print a summary of the dictionary containing GeoDataFrames
-def print_gdf_summary(gdf_dict):
-    """
-    Print a summary of the GeoDataFrames stored in a dictionary.
-    
-    Args:
-    gdf_dict (dict): A dictionary where keys are layer names and values are GeoDataFrames.
-    """
-    print("Summary of GeoDataFrames:")
-    print("=" * 40)
-    for layer_name, gdf in gdf_dict.items():
-        print(f"Layer: {layer_name}")
-        print(f" - Number of features: {len(gdf)}")
-        print(f" - Columns: {list(gdf.columns)}")
-        print(f" - CRS: {gdf.crs}")
-        print("=" * 40)
-
-# Example usage:
-# Plot a specific county and get the GeoDataFrames
-county_layers = plot_county_layers("36119_Westchester")
-
-# Print summary of the GeoDataFrames for the specified county
-print_gdf_summary(county_layers)
-'''
-# Plot all counties and get the GeoDataFrames
-all_layers = plot_county_layers("all")
-
-# Print summary of all GeoDataFrames
-print_gdf_summary(all_layers)
-
-'''
-
-from shapely.geometry import MultiLineString
-from shapely.ops import linemerge
-
-# Extract and process the specific layer by its name
-layer_name = "Con Edison EVM Feeder Winter Load Capacity for 3PH Feeders"
-specific_layer_gdf = county_layers.get(layer_name)
-
-# Check if the layer was found
-if specific_layer_gdf is not None:
-    # List of columns to keep other than 'FEEDER_ID', 'Shape__Length', and 'geometry'
-    other_columns = [col for col in specific_layer_gdf.columns if col not in ["FEEDER_ID", "Shape__Length", "geometry"]]
-    
-    # Define aggregation dictionary for dissolve:
-    # - Use 'first' for non-Shape__Length columns to keep the same values
-    # - Sum 'Shape__Length' to get the total length for each FEEDER_ID
-    agg_dict = {col: 'first' for col in other_columns}
-    agg_dict["Shape__Length"] = "sum"
-    
-    # Dissolve to combine rows with the same FEEDER_ID
-    combined_gdf = specific_layer_gdf.dissolve(by="FEEDER_ID", aggfunc=agg_dict)
-
-    # Reset the index to ensure FEEDER_ID is a column again
-    combined_gdf = combined_gdf.reset_index()
-    
-    # Merge LINESTRING geometries where necessary
-    def merge_geometry(geom):
-        if isinstance(geom, MultiLineString):
-            return linemerge(geom)
-        return geom  # If it's already a single LINESTRING, leave it as is
-
-    combined_gdf["geometry"] = combined_gdf.geometry.apply(merge_geometry)
-
-    # Rename the combined length column for clarity
-    combined_gdf["Shape_Length"] = combined_gdf["Shape__Length"]
-
-    # Display a summary of the combined layer
-    print(f"Layer: {layer_name} (Combined by FEEDER_ID)")
-    print(f" - Number of unique FEEDER_IDs: {len(combined_gdf)}")
-    print(f" - Columns: {list(combined_gdf.columns)}")
-    print(f" - CRS: {combined_gdf.crs}")
-    
-    # Optional: Display the first few rows to verify the result
-    print(combined_gdf[['FEEDER_ID', 'Shape_Length'] + other_columns].head())
-    
-    # Optional: Plot the combined layer
-    combined_gdf.plot()
-    plt.title(f"{layer_name} (Combined by FEEDER_ID)")
-    plt.show()
-else:
-    print(f"Layer '{layer_name}' not found.")
-
 from shapely.geometry import Point
 
-# Set the county name to correctly match the boundary layer key
-county_boundary_layer_name = "36119 Westchester boundary"
-feeder_layer_name = "Con Edison EVM Feeder Winter Load Capacity for 3PH Feeders"
+def plot_parcel_with_closest_feeder(
+    county_layers, 
+    light_box_gdf, 
+    feeder_layer_name="Con Edison EVM Feeder Winter Load Capacity for 3PH Feeders", 
+    county_boundary_layer_name="36119 Westchester boundary",
+    parcel_type="Residential", 
+    color="orange",
+    show_ev_headroom=False
+):
+    """
+    Plots parcels of a specified type within a county boundary and assigns the closest feeder's EV_HEADROOM.
+    
+    Args:
+    - county_layers (dict): Dictionary of GeoDataFrames for county layers.
+    - light_box_gdf (GeoDataFrame): GeoDataFrame of parcels with geometry and parcel type.
+    - feeder_layer_name (str): Name of the feeder layer in county_layers.
+    - county_boundary_layer_name (str): Name of the county boundary layer in county_layers.
+    - parcel_type (str): Type of parcel to filter (e.g., "Residential").
+    - color (str): Color to use for the plot of selected parcels.
+    - show_ev_headroom (bool): If True, plot parcels with shading by EV_HEADROOM.
+    """
+    # Retrieve the boundary and feeder layers
+    county_boundary_gdf = county_layers.get(county_boundary_layer_name)
+    feeder_gdf = county_layers.get(feeder_layer_name)
 
-# Retrieve the boundary and feeder layers
-county_boundary_gdf = county_layers.get(county_boundary_layer_name)
-feeder_gdf = county_layers.get(feeder_layer_name)
+    # Verify that both the county boundary and feeder layers were retrieved successfully
+    if county_boundary_gdf is None or feeder_gdf is None:
+        print("County boundary or feeder data not found.")
+        return
 
-# Verify that both the county boundary and feeder layers were retrieved successfully
-if county_boundary_gdf is None or feeder_gdf is None:
-    print("County boundary or feeder data not found.")
-else:
     # Use the single geometry from the county boundary GeoDataFrame
     county_boundary = county_boundary_gdf.geometry.iloc[0]
     
-    # Step 2: Select residential polygons within the county boundary
-    residential_polygons = light_box_gdf[
-        (light_box_gdf["parcel_type"] == "Residential") & 
+    # Select specified parcel type within the county boundary
+    selected_parcels = light_box_gdf[
+        (light_box_gdf["parcel_type"] == parcel_type) & 
         (light_box_gdf.within(county_boundary))
     ].copy()
     
-    # Ensure feeder_gdf and residential_polygons are in the same CRS
-    residential_polygons = residential_polygons.to_crs(feeder_gdf.crs)
+    # Ensure CRS matches between parcels and feeder lines
+    selected_parcels = selected_parcels.to_crs(feeder_gdf.crs)
     
-    # Step 3: Find the closest feeder for each residential polygon
+    # Find the closest feeder for each selected parcel and save FEEDER_ID and EV_HEADROOM
     closest_ev_headroom = []
+    closest_feeder_id = []
     
-    for polygon in residential_polygons.geometry:
+    for polygon in selected_parcels.geometry:
         polygon_centroid = polygon.centroid
         
         # Calculate distance from centroid to each feeder line
         distances = feeder_gdf.geometry.apply(lambda line: polygon_centroid.distance(line))
         
-        # Get the index of the closest feeder and retrieve its EV_HEADROOM
+        # Get the index of the closest feeder and retrieve its EV_HEADROOM and FEEDER_ID
         closest_idx = distances.idxmin()
         closest_ev_headroom.append(feeder_gdf.loc[closest_idx, "EV_HEADROOM"])
+        closest_feeder_id.append(feeder_gdf.loc[closest_idx, "FEEDER_ID"])
     
-    # Step 4: Assign the closest EV_HEADROOM to each residential polygon
-    residential_polygons["EV_HEADROOM"] = closest_ev_headroom
+    # Assign the closest EV_HEADROOM and FEEDER_ID to each selected parcel
+    selected_parcels["EV_HEADROOM"] = closest_ev_headroom
+    selected_parcels["FEEDER_ID"] = closest_feeder_id
     
-    # Display the updated GeoDataFrame with assigned EV_HEADROOM
-    print(residential_polygons[["geometry", "EV_HEADROOM"]].head())
-
-    # Optional: Plot the results for visualization
+    # Determine plot limits from the county boundary
+    xlim = (county_boundary.bounds[0], county_boundary.bounds[2])
+    ylim = (county_boundary.bounds[1], county_boundary.bounds[3])
+    
+    # Plot the results
     base = county_boundary_gdf.plot(color="none", edgecolor="black")
     feeder_gdf.plot(ax=base, color="blue", label="Feeder Lines")
-    residential_polygons.plot(ax=base, color="orange", label="Residential Polygons with EV_HEADROOM")
+    
+    if show_ev_headroom:
+        # Plot with color based on EV_HEADROOM values
+        selected_parcels.plot(
+            ax=base, column="EV_HEADROOM", legend=True, cmap="OrRd",
+            legend_kwds={'label': "EV Headroom (MW)", 'orientation': "horizontal"}
+        )
+    else:
+        # Plot using a single color
+        selected_parcels.plot(ax=base, color=color, label=f"{parcel_type} Parcels")
+
+    # Set plot limits and title
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    plt.title(f"{parcel_type} Parcels with Closest Feeder EV_HEADROOM in {county_boundary_layer_name}")
     plt.legend()
-    plt.title(f"Residential Polygons with Closest Feeder EV_HEADROOM in {county_boundary_layer_name}")
     plt.show()
+    
+    # Display the updated DataFrame with FEEDER_ID and EV_HEADROOM
+    print(selected_parcels[["geometry", "FEEDER_ID", "EV_HEADROOM"]].head())
+    return selected_parcels
+
+# Example usage
+# plot_parcel_with_closest_feeder(county_layers, light_box_gdf, parcel_type="Residential", color="orange", show_ev_headroom=False)
