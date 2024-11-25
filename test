@@ -1,2 +1,140 @@
->u<
-l l 
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+import numpy as np
+
+# Load the parquet file
+file_path = '/mnt/data/user_provided_file.parquet'  # Replace with actual file path
+df = pd.read_parquet(file_path)
+
+# Filter by scenario and subsector conditions
+df_filtered = df[
+    (df['scenario'] == "High+unmanaged") & 
+    (df['subsector'].str.startswith("Personal_"))
+]
+
+# Extract state from county and ensure state codes are two digits
+df_filtered['state'] = df_filtered['county'].str[:2]
+df_filtered['state'] = df_filtered['state'].apply(lambda x: x.zfill(2))
+
+# Sum 'value' for each time_est and county
+df_grouped = df_filtered.groupby(['time_est', 'county', 'state'], as_index=False)['value'].sum()
+
+# Load US shapefile for counties
+us_counties = gpd.read_file('tl_2019_us_county.shp')  # Replace with actual shapefile path
+us_counties['state'] = us_counties['GEOID'].str[:2]
+
+# Ensure county FIPS matches the dataframe
+us_counties = us_counties[['GEOID', 'geometry']]
+us_counties = us_counties.rename(columns={'GEOID': 'county'})
+
+# Merge the grouped data with the county shapefile
+df_geo = us_counties.merge(df_grouped, on='county', how='left')
+
+# Define time resolution functions
+def resample_data(df, resolution):
+    if resolution == 'hourly':
+        df['time_est'] = pd.to_datetime(df['time_est'])
+        return df
+    elif resolution == 'weekly':
+        df['time_est'] = pd.to_datetime(df['time_est']).dt.to_period('W').dt.start_time
+    elif resolution == 'monthly':
+        df['time_est'] = pd.to_datetime(df['time_est']).dt.to_period('M').dt.start_time
+    return df
+
+# Define heatmap plotting function
+def plot_heatmap(data, level, resolution, title):
+    avg_value = data['value'].mean()
+    data['percent_deviation'] = (data['value'] - avg_value) / avg_value * 100
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    data.plot(column='percent_deviation', cmap='coolwarm', legend=True, ax=ax, norm=Normalize(vmin=-100, vmax=100))
+    ax.set_title(title)
+    plt.axis('off')
+    plt.show()
+
+# Generate plots for each combination of resolutions
+time_resolutions = ['hourly', 'weekly', 'monthly']
+spatial_resolutions = ['county', 'state', 'country']
+
+for time_res in time_resolutions:
+    df_time_res = resample_data(df_geo.copy(), time_res)
+
+    for spatial_res in spatial_resolutions:
+        if spatial_res == 'state':
+            df_time_res = df_time_res.dissolve(by='state', aggfunc='mean').reset_index()
+        elif spatial_res == 'country':
+            df_time_res = df_time_res[['value']].mean().reset_index()
+
+        title = f"{spatial_res.capitalize()} Level | {time_res.capitalize()} Resolution"
+        plot_heatmap(df_time_res, spatial_res, time_res, title)
+
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
+
+# Load the US shapefile
+us_counties = gpd.read_file('tl_2019_us_county.shp')  # Replace with the actual shapefile path
+
+# Apply Lambert Conformal Conic projection
+lambert_crs = "EPSG:5070"  # US National Atlas Equal Area (similar to Lambert)
+us_counties = us_counties.to_crs(lambert_crs)
+
+# Separate Alaska and Hawaii for repositioning
+alaska = us_counties[us_counties['STATEFP'] == '02']  # Alaska
+hawaii = us_counties[us_counties['STATEFP'] == '15']  # Hawaii
+mainland = us_counties[~us_counties['STATEFP'].isin(['02', '15'])]  # Mainland US
+
+# Scale and reposition Alaska
+alaska = alaska.translate(xoff=-3000000, yoff=-2500000).scale(xfact=0.35, yfact=0.35, origin=(0, 0))
+
+# Scale and reposition Hawaii
+hawaii = hawaii.translate(xoff=500000, yoff=-2000000).scale(xfact=1.2, yfact=1.2, origin=(0, 0))
+
+# Combine back all geometries
+us_adjusted = pd.concat([mainland, alaska, hawaii])
+
+# Plot the adjusted map
+fig, ax = plt.subplots(figsize=(12, 8))
+us_adjusted.plot(ax=ax, edgecolor='black', color='lightgray')
+ax.set_title("US Map with Lambert Conformal Conic Projection", fontsize=14)
+plt.axis('off')
+plt.show()
+
+
+
+# Define a function for seasonal resolution
+def add_season_column(df):
+    df['time_est'] = pd.to_datetime(df['time_est'])
+    df['season'] = df['time_est'].dt.month % 12 // 3 + 1  # Map months to seasons
+    season_map = {1: 'Winter', 2: 'Spring', 3: 'Summer', 4: 'Fall'}
+    df['season'] = df['season'].map(season_map)
+    return df
+
+# Define heatmap plotting function for seasonal data
+def plot_seasonal_heatmap(data, level, title):
+    avg_value = data['value'].mean()
+    data['percent_deviation'] = (data['value'] - avg_value) / avg_value * 100
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    data.plot(column='percent_deviation', cmap='coolwarm', legend=True, ax=ax, norm=Normalize(vmin=-100, vmax=100))
+    ax.set_title(title, fontsize=14)
+    plt.axis('off')
+    plt.show()
+
+# Add season column to the data
+df_seasonal = add_season_column(df_grouped.copy())
+
+# Group by season and county for seasonal averages
+seasonal_data = df_seasonal.groupby(['season', 'county', 'state'], as_index=False)['value'].mean()
+
+# Merge seasonal data with the shapefile
+seasonal_geo = us_counties.merge(seasonal_data, on='county', how='left')
+
+# Plot heatmaps for each season
+seasons = ['Winter', 'Spring', 'Summer', 'Fall']
+for season in seasons:
+    season_data = seasonal_geo[seasonal_geo['season'] == season]
+    plot_seasonal_heatmap(season_data, 'county', f"County Level | {season} Seasonal Resolution")
+
