@@ -1,182 +1,195 @@
-import os
+import contextily as ctx
+# Replace Stamen Toner Lite with an alternative basemap provider
+basemap_source = ctx.providers.OpenStreetMap.Mapnik  # Alternative basemap
 
-# Get the current working directory
-current_directory = os.getcwd()
-print("Current Directory:", current_directory)
-# List all layers in the Geodatabase
-gdb_path = '/Users/adwaydas/epa_task7/data/networks/Geodatabase/FAF5Network.gdb'
-layers = fiona.listlayers(gdb_path)
-print("Available layers:", layers)
-import pandas as pd
+# Filter truck flow data where 'TOT Mixed Freight-Trips_17 All' >= 5
+filtered_truck_flow = truck_flow[truck_flow['TOT Mixed Freight-Trips_17 All'] >= 10]
 
-# Load the truck flow data
-truck_flow = pd.read_csv('/Users/adwaydas/epa_task7/data/truck_flow/CSV/FAF5 Total Truck Flows by Commodity_2017.csv')
-
-# Inspect columns and sample data
-print(truck_flow.columns)
-print(truck_flow.head())
-
-import geopandas as gpd
-
-# Path to the .gdb file
-gdb_path = '/Users/adwaydas/epa_task7/data/networks/Geodatabase/FAF5Network.gdb'
-
-# Load the 'FAF5_Links' layer
-highway_network = gpd.read_file(gdb_path, layer='FAF5_Links')
-
-# Inspect the data
-print(highway_network.columns)
-print(highway_network.head())
-
-# Load port shapefile
-ports = gpd.read_file('/Users/adwaydas/epa_task7/data/Principal_Ports/Principal_Ports.shp')
-# Ensure both datasets are in the same CRS
-ports = ports.to_crs(highway_network.crs)
-
-# Reproject ports and highway network to EPSG:5070
-ports = ports.to_crs(epsg=5070)
-highway_network = highway_network.to_crs(epsg=5070)
-
-# Perform the join
-highway_flow = highway_network.merge(truck_flow, on='ID')
-
-# Verify the joined data
-print(highway_flow.head())
-
-import matplotlib.pyplot as plt
-
-# Ensure the flow column is numeric
-highway_flow['TOT Mixed Freight-Tons_17 All'] = pd.to_numeric(highway_flow['TOT Mixed Freight-Tons_17 All'], errors='coerce')
-
-# Plot the flows
-highway_flow.plot(column='TOT Mixed Freight-Tons_17 All', cmap='OrRd', legend=True, figsize=(15, 10))
-plt.title('Truck Flow Intensity on US Highway Network (2017)')
-plt.show()
-
-import geopandas as gpd
-import osmnx as ox
-
-# Get mainland US boundary as a GeoDataFrame
-mainland_us = ox.geocode_to_gdf("United States", which_result=1)
-
-# Ensure mainland US and ports are in the same CRS
-mainland_us = mainland_us.to_crs(ports.crs)
-
-# Filter ports that intersect with mainland US
-ports_in_mainland = gpd.sjoin(ports, mainland_us, how='inner', predicate='intersects')
-
-# Verify the result
-print(f"Number of ports in mainland US: {len(ports_in_mainland)}")
-
-# Replace the original ports dataset if needed
-ports = ports_in_mainland
-
-def find_nearest_link_and_distance(port, network):
-    """
-    Finds the nearest link and distance from a port to the highway network.
-
-    Args:
-    port (shapely.geometry): Port geometry (Point).
-    network (GeoDataFrame): Highway network with geometry column.
-
-    Returns:
-    tuple: (nearest_link_row, distance)
-    """
-    # Find the nearest point on the network geometry
-    nearest_geom = nearest_points(port, network.unary_union)[1]
-    # Compute distances from the nearest point to all geometries in the network
-    distances = network.geometry.apply(lambda geom: geom.distance(nearest_geom))
-    # Find the row with the minimum distance
-    nearest_link_idx = distances.idxmin()
-    nearest_link = network.loc[nearest_link_idx]
-    # Calculate the exact distance from the port to the nearest point on the nearest link
-    distance = port.distance(nearest_geom)
-    return nearest_link, distance
-
-# Apply function to calculate nearest link and distance for each port
-results = ports.geometry.apply(lambda x: find_nearest_link_and_distance(x, highway_network))
-
-
-# Convert the results into a DataFrame
-results_df = pd.DataFrame(results.tolist(), columns=['nearest_link', 'distance'])
-
-# Assign the columns back to the ports DataFrame
-ports['nearest_link'] = results_df['nearest_link']
-ports['distance'] = results_df['distance']
-
-# Adjust port location to the nearest point on the network
-ports['adjusted_geometry'] = ports.apply(
-    lambda row: nearest_points(row.geometry, row['nearest_link'].geometry)[1], axis=1
+# Merge the filtered truck flow data with highway geometries
+merged_truck_flow = highway_within_buffer.merge(
+    filtered_truck_flow, left_on='ID', right_on='ID'
 )
-
-import matplotlib.pyplot as plt
-
-# Sort the ports DataFrame by distance in descending order
-top_ports = ports.nlargest(5, 'distance')
-
-# Plot the highway network, original port locations, and adjusted port locations
-fig, ax = plt.subplots(figsize=(12, 8))
-
-# Plot highway network
-highway_network.plot(ax=ax, color='gray', linewidth=0.5, label='Highway Network')
-
-# Plot original port locations
-top_ports.plot(ax=ax, color='blue', label='Original Port Location')
-
-# Plot adjusted port locations
-adjusted_ports = gpd.GeoDataFrame(top_ports, geometry=top_ports['adjusted_geometry'])
-adjusted_ports.plot(ax=ax, color='red', label='Adjusted Port Location')
-
-# Add legend and title
-plt.legend()
-plt.title('Ports with Maximum Distances to Highway Network')
-plt.show()
-
-import geopandas as gpd
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Reproject data to EPSG:5070 (USA Contiguous Albers Equal Area)
-ports = ports.to_crs(epsg=5070)
-highway_network = highway_network.to_crs(epsg=5070)
-
-# Select a sample port
-sample_port = ports.iloc[0]  # Replace with a specific index if needed
-
-# Create a 1000-mile buffer (in meters)
-mile_to_meter = 1609.34
-buffer_distance = 1000 * mile_to_meter  # 1000 miles in meters
-buffer = sample_port.geometry.buffer(buffer_distance)
-
-# Filter ports within the buffer
-ports_within_buffer = ports[ports.geometry.within(buffer)]
-
-# Filter highway network links intersecting the buffer
-highway_within_buffer = highway_network[highway_network.geometry.intersects(buffer)]
-
-# Filter truck flow data
-# Assuming `truck_flow` is a GeoDataFrame with a `LINKID` column matching `highway_network['ID']`
-truck_flow = truck_flow.set_index('ID')  # Ensure `ID` is set as the index
-filtered_highway_ids = highway_within_buffer['ID']
-truck_flow_within_buffer = truck_flow.loc[truck_flow.index.isin(filtered_highway_ids)]
 
 # Plot the results
 fig, ax = plt.subplots(figsize=(15, 10))
 
-# Plot the highway network within the buffer
+# Plot the highway network (base layer)
 highway_within_buffer.plot(ax=ax, color='gray', linewidth=0.5, label='Filtered Highway Network')
 
 # Plot the buffer
 gpd.GeoSeries([buffer]).plot(ax=ax, color='lightblue', alpha=0.5, label='1000-Mile Boundary')
 
 # Plot the original sample port
-gpd.GeoDataFrame([sample_port], geometry='geometry').plot(ax=ax, color='red', label='Sample Port')
+gpd.GeoDataFrame([sample_port], geometry='adjusted_geometry').plot(ax=ax, color='red', label='Sample Port')
+
+# Plot the truck flow using merged geometries
+merged_truck_flow.plot(
+    ax=ax,
+    column='TOT Mixed Freight-Trips_17 All',
+    cmap='OrRd',
+    legend=True,
+    legend_kwds={'label': 'Daily Truck Flow (Trips)', 'shrink': 0.6}
+)
 
 # Plot the filtered ports
 ports_within_buffer.plot(ax=ax, color='green', label='Filtered Ports')
 
+# Add a basemap
+ctx.add_basemap(ax, source=basemap_source, crs=highway_within_buffer.crs)
+
 # Add legend and title
+plt.legend(loc='upper right')
+plt.title('Filtered Ports, Highway Network, and Truck Flow Within 250-Mile Boundary')
+plt.show()
+
+
+
+
+
+
+
+
+merged_truck_flow['TOT Mixed Freight-Trips_17 All'].hist(bins=100)
+
+
+
+# Merge truck_flow with highway_network to add geometry
+truck_flow_geo = truck_flow.merge(
+    highway_network[['ID', 'geometry']], 
+    on='ID', 
+    how='inner'
+)
+
+# Convert to GeoDataFrame
+truck_flow_geo = gpd.GeoDataFrame(truck_flow_geo, geometry='geometry')
+
+# Ensure CRS matches between truck_flow_geo and ports
+if truck_flow_geo.crs != ports.crs:
+    truck_flow_geo = truck_flow_geo.to_crs(ports.crs)
+
+
+from shapely.ops import nearest_points
+
+def find_nearest_link(port, truck_flow_geo):
+    # Find the nearest geometry
+    nearest_geom = nearest_points(port, truck_flow_geo.unary_union)[1]
+    
+    # Match the geometry in truck_flow_geo
+    nearest_link = truck_flow_geo.loc[truck_flow_geo.geometry == nearest_geom]
+    
+    # Check if any link was found
+    if nearest_link.empty:
+        return None  # Return None if no match is found
+    
+    return nearest_link.iloc[0]
+
+# Assign nearest link truck flow to each port
+ports['nearest_link'] = ports.geometry.apply(lambda x: find_nearest_link(x, truck_flow_geo))
+
+# Filter out ports with no nearest link
+ports_with_links = ports[ports['nearest_link'].notnull()]
+
+# Assign truck flow from nearest links
+ports_with_links['TOT Mixed Freight-Trips_17 All'] = ports_with_links['nearest_link'].apply(
+    lambda x: x['TOT Mixed Freight-Trips_17 All'] if isinstance(x, pd.Series) else None
+)
+
+
+
+
+
+import osmnx as ox
+import geopandas as gpd
+
+# Fetch mainland US polygon (if needed for clipping)
+mainland_us = ox.geocode_to_gdf("United States", which_result=1)
+
+# Fetch county-level administrative boundaries
+import geopandas as gpd
+
+# Load the TIGER/Line county shapefile
+county_shapefile = "/Users/adwaydas/epa_task7/data/tl_2024_us_county/tl_2024_us_county.shp"  # Replace with the actual path
+counties = gpd.read_file(county_shapefile)
+
+# Generate 200-mile (approx. 321 km) buffers for each port
+mile_to_meter = 1609.34
+ports['buffer'] = ports.geometry.buffer(200 * mile_to_meter)
+
+# Ensure CRS matches between counties and ports
+if counties.crs != ports.crs:
+    counties = counties.to_crs(ports.crs)
+
+# Ensure the 'buffer' column is set as the active geometry
+ports = ports.set_geometry('buffer')
+
+# Spatial overlay to intersect counties with port buffers
+counties_within_buffers = gpd.overlay(counties, ports[['buffer', 'FID']], how='intersection')
+
+# Set geometry back to 'geometry' after the overlay
+counties_within_buffers = counties_within_buffers.set_geometry('geometry')
+
+# Calculate intersection area
+counties_within_buffers['intersection_area'] = counties_within_buffers.geometry.area
+
+
+
+# Normalize intersection area by grouping based on the correct column
+counties_within_buffers['normalized_area'] = counties_within_buffers.groupby('GEOID')['intersection_area'].transform('sum')
+
+# Calculate trip share based on the normalized intersection area
+counties_within_buffers['trip_share'] = counties_within_buffers['intersection_area'] / counties_within_buffers['normalized_area']
+
+# Distribute trips from each port to intersecting counties
+counties_within_buffers['trips'] = counties_within_buffers['trip_share'] * counties_within_buffers['TOT Mixed Freight-Trips_17 All']
+
+
+
+
+# Normalize intersection area to distribute trips
+counties_within_buffers['normalized_area'] = counties_within_buffers.groupby('index')['intersection_area'].transform('sum')
+counties_within_buffers['trip_share'] = counties_within_buffers['intersection_area'] / counties_within_buffers['normalized_area']
+
+# Distribute trips from each port to intersecting counties
+counties_within_buffers['trips'] = counties_within_buffers['trip_share'] * counties_within_buffers['TOT Mixed Freight-Trips_17 All']
+
+
+
+# Adjust trips for overlapping counties served by multiple ports
+for county_id, group in counties_within_buffers.groupby('county_id'):
+    total_trips = group['trips'].sum()
+    overlap_ports = group['ID'].nunique()
+    counties_within_buffers.loc[group.index, 'final_trips'] = group['trips'] / overlap_ports
+
+
+
+# Iterate over overlapping counties to refine trip allocation
+for i in range(5):  # Example: 5 iterations
+    for county_id, group in counties_within_buffers.groupby('county_id'):
+        counties_within_buffers.loc[group.index, 'final_trips'] = group['trips'] / group['ID'].nunique()
+
+
+
+
+import matplotlib.pyplot as plt
+
+# Plot the distribution of trips
+fig, ax = plt.subplots(figsize=(15, 10))
+
+# Plot counties with trips
+counties_within_buffers.plot(
+    ax=ax,
+    column='final_trips',
+    cmap='OrRd',
+    legend=True,
+    legend_kwds={'label': 'Estimated Trips to Counties'}
+)
+
+# Plot ports and their buffers
+ports.plot(ax=ax, color='blue', label='Ports')
+gpd.GeoSeries(ports['buffer']).plot(ax=ax, color='lightblue', alpha=0.3, label='Port Service Boundaries')
+
+# Add title and legend
+plt.title("Estimated Truck Trips to Counties from Ports")
 plt.legend()
-plt.title('Filtered Ports, Highway Network, and Truck Flow Within 1000-Mile Boundary')
 plt.show()
 
