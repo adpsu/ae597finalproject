@@ -1,19 +1,36 @@
 import pandas as pd
+import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import os
 import glob
 
-# Load US shapefile for counties
-us_counties = gpd.read_file('tl_2019_us_county.shp')  # Replace with actual shapefile path
-us_counties['state'] = us_counties['GEOID'].str[:2]
+# Step 1: Load US Counties Shapefile
+shapefile_path = 'tl_2019_us_county.shp'  # Replace with the actual path
+us_counties = gpd.read_file(shapefile_path)
+us_counties['state'] = us_counties['GEOID'].str[:2]  # Extract state codes
 us_counties = us_counties[['GEOID', 'geometry']].rename(columns={'GEOID': 'county'})
 
-# Initialize a dictionary to store aggregated values for each county and time resolution
-county_time_aggregates = {}
+# Step 2: Generate synthetic dataset
+np.random.seed(42)
 
-# Define time resolution function
+# Generate timestamps
+time_range = pd.date_range(start="2018-01-01 00:00:00", end="2018-12-31 23:00:00", freq="H")
+
+# Generate random counties (FIPS codes: 5 digits)
+counties = us_counties['county'].tolist()
+
+# Create synthetic data
+data = {
+    "time_est": np.random.choice(time_range, size=100000),
+    "county": np.random.choice(counties, size=100000),
+    "value": np.random.uniform(1.0, 100.0, size=100000),
+}
+synthetic_df = pd.DataFrame(data)
+synthetic_df["county"] = synthetic_df["county"].str.zfill(5)  # Ensure leading zeros
+
+# Step 3: Define resampling function
 def resample_data(df, resolution):
     df['time_est'] = pd.to_datetime(df['time_est'])
     if resolution == 'hourly':
@@ -24,49 +41,43 @@ def resample_data(df, resolution):
         df['time_est'] = df['time_est'].dt.to_period('M').dt.start_time
     return df
 
-# Path to the folder containing CSVs
-csv_folder = '/scratch/county_data'  # Replace with actual path
-csv_files = glob.glob(os.path.join(csv_folder, '*.csv'))
-
-# Time and spatial resolutions
+# Step 4: Aggregate data for each time resolution
 time_resolutions = ['hourly', 'weekly', 'monthly']
 spatial_resolutions = ['county', 'state', 'country']
 
-# Aggregate data incrementally
-for file in csv_files:
-    print(f"Processing file: {file}")
-    df = pd.read_csv(file)
+# Initialize a dictionary for aggregated data
+county_time_aggregates = {}
 
-    # Process each time resolution
-    for time_res in time_resolutions:
-        df_time_res = resample_data(df.copy(), time_res)
+for time_res in time_resolutions:
+    resampled_df = resample_data(synthetic_df.copy(), time_res)
 
-        # Aggregate 'value' for each county and time resolution
-        grouped = df_time_res.groupby(['time_est', 'county'])['value'].sum().reset_index()
+    # Aggregate values by county and time resolution
+    grouped = resampled_df.groupby(['time_est', 'county'])['value'].sum().reset_index()
 
-        # Update the dictionary with aggregated values
-        for _, row in grouped.iterrows():
-            key = (row['time_est'], row['county'])  # Use (time_est, county) as key
-            if key in county_time_aggregates:
-                county_time_aggregates[key] += row['value']
-            else:
-                county_time_aggregates[key] = row['value']
+    # Store aggregated values
+    for _, row in grouped.iterrows():
+        key = (row['time_est'], row['county'])
+        if key in county_time_aggregates:
+            county_time_aggregates[key] += row['value']
+        else:
+            county_time_aggregates[key] = row['value']
 
-print("Aggregation by time resolution complete.")
-
-# Convert aggregated data into a DataFrame
+# Step 5: Convert aggregated data to a DataFrame
 aggregated_df = pd.DataFrame.from_dict(county_time_aggregates, orient='index', columns=['value']).reset_index()
 aggregated_df[['time_est', 'county']] = pd.DataFrame(aggregated_df['index'].tolist(), index=aggregated_df.index)
 aggregated_df = aggregated_df.drop(columns=['index'])
 
-# Plot 3x3 grid
+# Step 6: Plot 3x3 grid of heatmaps
 fig, axes = plt.subplots(3, 3, figsize=(18, 15), constrained_layout=True)
-for i, time_res in enumerate(time_resolutions):
-    for j, spatial_res in enumerate(spatial_resolutions):
-        # Prepare data for current resolution combination
-        filtered_df = aggregated_df.copy()
 
-        # Handle spatial aggregation
+for i, time_res in enumerate(time_resolutions):
+    resampled_df = resample_data(aggregated_df.copy(), time_res)
+    
+    for j, spatial_res in enumerate(spatial_resolutions):
+        # Prepare data for the resolution
+        filtered_df = resampled_df.copy()
+
+        # Handle spatial resolution
         if spatial_res == 'state':
             filtered_df['county'] = filtered_df['county'].astype(str)
             merged = us_counties.merge(filtered_df, on='county', how='left')
@@ -79,11 +90,11 @@ for i, time_res in enumerate(time_resolutions):
             filtered_df['county'] = filtered_df['county'].astype(str)
             merged = us_counties.merge(filtered_df, on='county', how='left')
 
-        # Normalize data for plotting
+        # Normalize values for heatmap
         avg_value = merged['value'].mean()
         merged['percent_deviation'] = (merged['value'] - avg_value) / avg_value * 100
 
-        # Plot heatmap in the grid
+        # Plot heatmap
         ax = axes[i, j]
         if spatial_res == 'country':
             merged.plot(kind='bar', ax=ax, color='blue', legend=False)
@@ -95,6 +106,6 @@ for i, time_res in enumerate(time_resolutions):
             ax.set_title(f"{spatial_res.capitalize()} | {time_res.capitalize()}")
             ax.axis('off')
 
-# Set global titles
+# Global title
 fig.suptitle("3x3 Grid Heatmap: Spatial vs Temporal Resolutions", fontsize=16)
 plt.show()
