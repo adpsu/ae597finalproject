@@ -3,8 +3,6 @@ import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-import os
-import glob
 
 # Step 1: Load US Counties Shapefile
 shapefile_path = 'tl_2019_us_county.shp'  # Replace with the actual path
@@ -29,6 +27,7 @@ data = {
 }
 synthetic_df = pd.DataFrame(data)
 synthetic_df["county"] = synthetic_df["county"].str.zfill(5)  # Ensure leading zeros
+synthetic_df["state"] = synthetic_df["county"].str[:2]  # Extract state codes
 
 # Step 3: Define resampling function
 def resample_data(df, resolution):
@@ -66,6 +65,7 @@ for time_res in time_resolutions:
 aggregated_df = pd.DataFrame.from_dict(county_time_aggregates, orient='index', columns=['value']).reset_index()
 aggregated_df[['time_est', 'county']] = pd.DataFrame(aggregated_df['index'].tolist(), index=aggregated_df.index)
 aggregated_df = aggregated_df.drop(columns=['index'])
+aggregated_df["state"] = aggregated_df["county"].str[:2]  # Ensure state is available for dissolving
 
 # Step 6: Plot 3x3 grid of heatmaps
 fig, axes = plt.subplots(3, 3, figsize=(18, 15), constrained_layout=True)
@@ -79,15 +79,13 @@ for i, time_res in enumerate(time_resolutions):
 
         # Handle spatial resolution
         if spatial_res == 'state':
-            filtered_df['county'] = filtered_df['county'].astype(str)
-            merged = us_counties.merge(filtered_df, on='county', how='left')
+            filtered_df = filtered_df.groupby(['time_est', 'state'])['value'].sum().reset_index()
+            merged = us_counties.merge(filtered_df, on='state', how='left')
             merged = merged.dissolve(by='state', aggfunc='sum').reset_index()
         elif spatial_res == 'country':
-            filtered_df['county'] = filtered_df['county'].astype(str)
             merged = us_counties.merge(filtered_df, on='county', how='left')
             merged = pd.DataFrame({'value': [merged['value'].sum()]})
         else:  # 'county'
-            filtered_df['county'] = filtered_df['county'].astype(str)
             merged = us_counties.merge(filtered_df, on='county', how='left')
 
         # Normalize values for heatmap
@@ -97,7 +95,7 @@ for i, time_res in enumerate(time_resolutions):
         # Plot heatmap
         ax = axes[i, j]
         if spatial_res == 'country':
-            merged.plot(kind='bar', ax=ax, color='blue', legend=False)
+            ax.bar(["US"], [merged['value'][0]], color='blue')
             ax.set_title(f"{spatial_res.capitalize()} | {time_res.capitalize()}")
             ax.set_ylabel("% Deviation")
         else:
